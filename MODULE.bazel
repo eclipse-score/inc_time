@@ -110,6 +110,7 @@ llvm = use_extension(
 )
 llvm.toolchain(
     llvm_version = "19.1.7",
+    stdlib = {"": "stdc++"},
 )
 
 # Coverage-only Clang instance (covmap instrumentation for the LLVM coverage
