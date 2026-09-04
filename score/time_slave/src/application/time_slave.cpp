@@ -19,6 +19,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <string>
+#include <string_view>
 #include <thread>
 
 namespace score
@@ -63,7 +64,8 @@ std::int32_t TimeSlave::Initialize(const score::mw::lifecycle::ApplicationContex
         opts_ = cfg.engine_opts;
         score::mw::log::LogInfo(kTimeSlaveAppContext)
             << "Loaded config from " << config_path.string() << " (iface=" << opts_.iface_name
-            << ", phc=" << (opts_.phc_config.enabled ? "enabled" : "disabled") << ")";
+            << ", phc=" << (opts_.phc_config.enabled ? std::string_view{"enabled"} : std::string_view{"disabled"})
+            << ")";
     }
     else
     {
