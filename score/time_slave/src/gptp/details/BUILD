@@ -67,6 +67,8 @@ cc_library(
         ":os_syscalls",
         ":ptp_types",
         ":raw_socket",
+        "//score/time_slave/src/common:logging_contexts",
+        "@score_baselibs//score/mw/log:frontend",
     ],
 )
 

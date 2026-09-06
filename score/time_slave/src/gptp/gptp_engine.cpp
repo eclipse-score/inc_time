@@ -32,7 +32,7 @@ namespace details
 namespace
 {
 
-constexpr int kRxTimeoutMs = 100;  // poll timeout; keeps RxLoop responsive to shutdown
+constexpr int kRxTimeoutMs = 500;  // poll timeout; keeps RxLoop responsive to shutdown
 constexpr int kRxBufferSize = 2048;
 
 }  // namespace
@@ -70,13 +70,17 @@ GptpEngine::~GptpEngine() noexcept
 
 bool GptpEngine::Initialize()
 {
+    mw::log::LogInfo(kTimeSlaveAppContext) << "GptpEngine: Initializing on " << opts_.iface_name;
     if (running_.load(std::memory_order_acquire))
+    {
+        mw::log::LogWarn(kTimeSlaveAppContext) << "GptpEngine::Initialize: Engine is already running";
         return true;
+    }
 
     if (!identity_->Resolve(opts_.iface_name))
     {
         score::mw::log::LogError(kTimeSlaveAppContext)
-            << "GptpEngine: failed to resolve ClockIdentity for " << opts_.iface_name;
+            << "GptpEngine::Initialize: Failed to resolve ClockIdentity for " << opts_.iface_name;
         return false;
     }
 
@@ -85,14 +89,14 @@ bool GptpEngine::Initialize()
     if (!socket_->Open(opts_.iface_name))
     {
         score::mw::log::LogError(kTimeSlaveAppContext)
-            << "GptpEngine: failed to open raw socket on " << opts_.iface_name;
+            << "GptpEngine::Initialize: Failed to open raw socket on " << opts_.iface_name;
         return false;
     }
 
     if (!socket_->EnableHwTimestamping())
     {
-        score::mw::log::LogWarn(kTimeSlaveAppContext)
-            << "GptpEngine: HW timestamping not available on " << opts_.iface_name << ", falling back to SW timestamps";
+        score::mw::log::LogWarn(kTimeSlaveAppContext) << "GptpEngine::Initialize: HW timestamping not available on "
+                                                      << opts_.iface_name << ", falling back to SW timestamps";
     }
 
     running_.store(true, std::memory_order_release);
@@ -108,7 +112,7 @@ bool GptpEngine::Initialize()
     catch (const std::system_error& e)
     {
         score::mw::log::LogError(kTimeSlaveAppContext)
-            << "GptpEngine: failed to create RxThread: " << std::string_view{e.what()};
+            << "GptpEngine::Initialize: Failed to create RxThread: " << std::string_view{e.what()};
         running_.store(false, std::memory_order_release);
         socket_->Close();
         return false;
@@ -123,7 +127,7 @@ bool GptpEngine::Initialize()
     catch (const std::system_error& e)
     {
         score::mw::log::LogError(kTimeSlaveAppContext)
-            << "GptpEngine: failed to create PdelayThread: " << std::string_view{e.what()};
+            << "GptpEngine::Initialize: Failed to create PdelayThread: " << std::string_view{e.what()};
         Deinitialize();
         return false;
     }
@@ -258,11 +262,13 @@ void GptpEngine::HandlePacket(const std::uint8_t* frame, int len, const ::timesp
     switch (msg.msgtype)
     {
         case kPtpMsgtypePdelayReq:
+            mw::log::LogDebug(kGPtpMachineContext) << "PdelayReq message received, hw_ts=" << hw_ts.ns << " ns";
             if (msg.ptpHdr.domainNumber == opts_.domain_number)
                 SendPDelayResponseAndFollowUp(msg, hw_ts);
             break;
 
         case kPtpMsgtypeSync:
+            mw::log::LogDebug(kGPtpMachineContext) << "Sync message received, hw_ts=" << hw_ts.ns << " ns";
             if (msg.ptpHdr.domainNumber != opts_.domain_number)
                 break;
             msg.recvHardwareTS = hw_ts;
@@ -271,6 +277,7 @@ void GptpEngine::HandlePacket(const std::uint8_t* frame, int len, const ::timesp
             break;
 
         case kPtpMsgtypeFollowUp:
+            mw::log::LogDebug(kGPtpMachineContext) << "FollowUp message received, hw_ts=" << hw_ts.ns << " ns";
             if (msg.ptpHdr.domainNumber != opts_.domain_number)
                 break;
             msg.parseMessageTs = TimestampToTmv(msg.follow_up.preciseOriginTimestamp);
@@ -295,6 +302,7 @@ void GptpEngine::HandlePacket(const std::uint8_t* frame, int len, const ::timesp
             break;
 
         case kPtpMsgtypePdelayResp:
+            mw::log::LogDebug(kGPtpMachineContext) << "PdelayResp message received, hw_ts=" << hw_ts.ns << " ns";
             msg.recvHardwareTS = hw_ts;
             msg.parseMessageTs = TimestampToTmv(msg.pdelay_resp.requestReceiptTimestamp);
             if (pdelay_)
@@ -302,12 +310,16 @@ void GptpEngine::HandlePacket(const std::uint8_t* frame, int len, const ::timesp
             break;
 
         case kPtpMsgtypePdelayRespFollowUp:
+            mw::log::LogDebug(kGPtpMachineContext)
+                << "PdelayRespFollowUp message received, hw_ts=" << hw_ts.ns << " ns";
             msg.parseMessageTs = TimestampToTmv(msg.pdelay_resp_fup.responseOriginReceiptTimestamp);
             if (pdelay_)
                 pdelay_->OnResponseFollowUp(msg);
             break;
 
         default:
+            mw::log::LogDebug(kGPtpMachineContext)
+                << "Unhandled message received: " << static_cast<int>(msg.msgtype) << ", hw_ts=" << hw_ts.ns << " ns";
             break;
     }
 }
