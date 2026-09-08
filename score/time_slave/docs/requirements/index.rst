@@ -17,7 +17,7 @@ Time Slave Component Requirements
 
 .. document:: Time Slave Requirements
    :id: doc__time_slave_requirements
-   :status: draft
+   :status: valid
    :version: 1
    :safety: QM
    :security: NO
@@ -30,8 +30,8 @@ Functional Requirements
 Initialization and Lifecycle
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. comp_req:: Component Initialization
-   :id: comp_req__time_slave__initialization
+.. comp_req:: Component Startup
+   :id: comp_req__time_slave__startup
    :reqtype: Functional
    :security: NO
    :safety: QM
@@ -40,7 +40,25 @@ Initialization and Lifecycle
    :version: 1
    :satisfied_by: comp__time_slave
 
-   The time_slave component shall initialize the gPTP engine and IPC publisher, bind to the configured network interface, and attempt to enable hardware timestamping on the network interface during initialization.
+   On startup the time_slave component shall determine its configuration, initialize the gPTP engine and IPC publisher, bind to the configured network interface, and attempt to enable hardware timestamping on the network interface during initialization. Any (unrecoverable) error shall terminate the startup procedure and end the time_slave process.
+
+.. comp_req:: Component Configuration
+   :id: comp_req__time_slave__configuration
+   :reqtype: Functional
+   :security: NO
+   :safety: QM
+   :derived_from: feat_req__time__vehicle_time_ctrl_flow[version==1]
+   :status: valid
+   :version: 1
+   :satisfied_by: comp__time_slave
+
+   The time_slave component shall try to read its configuration from a file. The file location is defined in this order:
+    1. Specified by command line argument `--config <filepath>`,
+    2. specified by environment variable `TIMESLAVE_CONFIG`,
+    3. the default path `./etc/time_slave_config.json`.
+
+   If the defined file is not present or its parsing fails (due to malformed content), a warning shall be generated and predefined default values shall be used for the configuration items.
+   Likewise, if certain configuration items are missing in the file, their predefined default values shall be used.
 
 .. comp_req:: Component Shutdown
    :id: comp_req__time_slave__shutdown
@@ -52,7 +70,10 @@ Initialization and Lifecycle
    :version: 1
    :satisfied_by: comp__time_slave
 
-   The time_slave component shall stop message processing threads, close network sockets, and release IPC resources when deinitialized or when a stop signal is received.
+   On receiving a stop signal the time_slave component shall stop message processing threads, close network sockets, and release IPC resources.
+
+gPTP Message Processing
+^^^^^^^^^^^^^^^^^^^^^^^
 
 .. comp_req:: Domain Number Filtering
    :id: comp_req__time_slave__domain_filtering
@@ -64,10 +85,19 @@ Initialization and Lifecycle
    :version: 1
    :satisfied_by: comp__time_slave
 
-   The time_slave component shall filter gPTP messages by domain number (0-127 per IEEE 802.1AS) and process only messages matching the configured domain.
+   According to IEEE 802.1AS, the time_slave component shall only process received gPTP Sync and FollowUp messages matching the configured domain number (0-127 per IEEE 802.1AS). The time_slave component shall only process received gPTP Pdelay messages matching the domain number 0. It shall use the domain number 0 in send gPTP Pdelay messages.
 
-gPTP Protocol Message Processing
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. comp_req:: Ethernet address usage
+   :id: comp_req__time_slave__ethernet_address
+   :reqtype: Functional
+   :security: NO
+   :safety: QM
+   :derived_from: feat_req__time__vehicle_time_sync[version==1]
+   :status: valid
+   :version: 1
+   :satisfied_by: comp__time_slave
+
+   The time_slave component shall receive IEEE 802.1AS event messages (Sync, Follow_Up, Pdelay_Resp, Pdelay_Resp_Follow_Up) sent to the Ethernet address specified in the IEEE 801.1AS standard. It shall send event messages (Pdelay_Req) to the same address.
 
 .. comp_req:: Sync Message Reception
    :id: comp_req__time_slave__sync_reception
@@ -79,7 +109,7 @@ gPTP Protocol Message Processing
    :version: 1
    :satisfied_by: comp__time_slave
 
-   The time_slave component shall receive IEEE 802.1AS Sync messages from the network Grand Master and extract the receive timestamp using hardware timestamping when available, otherwise using software timestamping as a fallback.
+   The time_slave component shall receive IEEE 802.1AS Sync messages from the network Grand Master via the IEEE 802.1AS-specified Ethernet address and determine the receive timestamp using hardware timestamping when available, otherwise using software timestamping as a fallback.
 
 .. comp_req:: Follow_Up Message Processing
    :id: comp_req__time_slave__followup_processing
@@ -117,6 +147,43 @@ gPTP Protocol Message Processing
 
    The time_slave component shall transmit IEEE 802.1AS PDelayReq messages at the configured interval (configurable, default 1000 milliseconds) and record the transmit timestamp.
 
+.. comp_req:: PDelayReq Response
+   :id: comp_req__time_slave__pdelay_req_response
+   :reqtype: Functional
+   :security: NO
+   :safety: QM
+   :derived_from: feat_req__time__vehicle_time_sync[version==1]
+   :status: valid
+   :version: 1
+   :satisfied_by: comp__time_slave
+
+   The time_slave component shall receive IEEE 802.1AS PDelayReq messages from peer nodes, record the receive timestamp, and respond with PDelayResp and PDelayRespFollowUp messages containing the requestReceiptTimestamp and responseOriginTimestamp per IEEE 802.1AS peer delay mechanism.
+
+
+.. comp_req:: PDelayResp Message Reception
+   :id: comp_req__time_slave__pdelay_resp_reception
+   :reqtype: Functional
+   :security: NO
+   :safety: QM
+   :derived_from: feat_req__time__vehicle_time_sync[version==1]
+   :status: valid
+   :version: 1
+   :satisfied_by: comp__time_slave
+
+   The time_slave component shall receive IEEE 802.1AS PDelayResp messages in response to transmitted PDelayReq messages and extract the requestReceiptTimestamp from the message.
+
+.. comp_req:: PDelayRespFollowUp Message Reception
+   :id: comp_req__time_slave__pdelay_resp_followup_reception
+   :reqtype: Functional
+   :security: NO
+   :safety: QM
+   :derived_from: feat_req__time__vehicle_time_sync[version==1]
+   :status: valid
+   :version: 1
+   :satisfied_by: comp__time_slave
+
+   The time_slave component shall receive IEEE 802.1AS PDelayRespFollowUp messages, match them to the corresponding PDelayResp message by sequence ID, and extract the responseOriginTimestamp.
+
 .. comp_req:: Peer Delay Computation
    :id: comp_req__time_slave__pdelay_computation
    :reqtype: Functional
@@ -127,7 +194,7 @@ gPTP Protocol Message Processing
    :version: 1
    :satisfied_by: comp__time_slave
 
-   The time_slave component shall compute network peer delay from PDelayResp and PDelayRespFollowUp timestamps using the IEEE 802.1AS peer delay formula: ((t2 - t1) + (t4 - t3c)) / 2, where t3c is the response origin timestamp corrected by the sum of the PDelayResp and PDelayRespFollowUp correction fields.
+   The time_slave component shall compute network propagation delay from PDelayResp and PDelayRespFollowUp timestamps using the IEEE 802.1AS propagation delay formula: ((t4 - t1) - (t3 - t2)) / 2, where t2 is the requestReceiptTimestamp and t3 is the responseOriginTimestamp each corrected by the correctionField of the corresponding PdelayResp or PdelayRespFollowUp message.
 
 Clock Synchronization
 ^^^^^^^^^^^^^^^^^^^^^
@@ -142,7 +209,7 @@ Clock Synchronization
    :version: 1
    :satisfied_by: comp__time_slave
 
-   The time_slave component shall step-adjust the PTP hardware clock offset when the absolute value of the computed offset exceeds the configured step threshold (configurable, default 1 second).
+   The time_slave component shall step-adjust the PTP hardware clock (PHC - the network interface hardware clock used for timestamping per IEEE 1588/802.1AS) offset when the absolute value of the computed offset exceeds the configured step threshold (configurable, default 1 second).
 
 .. comp_req:: PHC Frequency Adjustment
    :id: comp_req__time_slave__phc_frequency
@@ -156,44 +223,6 @@ Clock Synchronization
 
    The time_slave component shall slew-adjust the PTP hardware clock frequency based on the neighbor rate ratio computed from consecutive Sync/Follow_Up pairs with positive time intervals per IEEE 802.1AS Clause 11.4.1.
 
-Status and Fault Detection
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-.. comp_req:: Synchronization Timeout Detection
-   :id: comp_req__time_slave__sync_timeout
-   :reqtype: Functional
-   :security: NO
-   :safety: QM
-   :derived_from: feat_req__time__vehicle_time_sync[version==1]
-   :status: valid
-   :version: 1
-   :satisfied_by: comp__time_slave
-
-   The time_slave component shall set the timeout status flag when no Sync/Follow_Up message pair is successfully processed within the configured timeout period (configurable, range 100 milliseconds to 10 seconds).
-
-.. comp_req:: Time Leap Future Detection
-   :id: comp_req__time_slave__leap_future
-   :reqtype: Functional
-   :security: NO
-   :safety: QM
-   :derived_from: feat_req__time__vehicle_time_acc_qual_api[version==1]
-   :status: valid
-   :version: 1
-   :satisfied_by: comp__time_slave
-
-   The time_slave component shall set the time leap future flag when the master time increases by more than the configured future leap threshold between consecutive Sync/Follow_Up pairs. The future leap threshold shall be configurable in the range 1 millisecond to 60 seconds, with validation enforced during configuration loading.
-
-.. comp_req:: Time Leap Past Detection
-   :id: comp_req__time_slave__leap_past
-   :reqtype: Functional
-   :security: NO
-   :safety: QM
-   :derived_from: feat_req__time__vehicle_time_acc_qual_api[version==1]
-   :status: valid
-   :version: 1
-   :satisfied_by: comp__time_slave
-
-   The time_slave component shall set the time leap past flag when the master time decreases between consecutive Sync/Follow_Up pairs.
 
 Data Publishing
 ^^^^^^^^^^^^^^^
@@ -208,25 +237,13 @@ Data Publishing
    :version: 1
    :satisfied_by: comp__time_slave
 
-   The time_slave component shall publish synchronized time data (PTP assumed time, offset correction, rate deviation, peer delay, status flags) via the ts_client IPC interface after processing each Sync/Follow_Up message pair.
-
-.. comp_req:: Publish Interval
-   :id: comp_req__time_slave__publish_interval
-   :reqtype: Functional
-   :security: NO
-   :safety: QM
-   :derived_from: feat_req__time__vehicle_time_ctrl_flow[version==1]
-   :status: valid
-   :version: 1
-   :satisfied_by: comp__time_slave
-
-   The time_slave component shall update the published time snapshot at a fixed interval of 50 milliseconds to provide consistent read latency for VehicleTime clients.
+   The time_slave component shall publish synchronized time data (PTP assumed time, offset correction, rate deviation, peer delay, status flags) via the ts_client IPC interface at a fixed interval of 50 milliseconds to provide consistent read latency for VehicleTime clients.
 
 Platform Abstraction
 ^^^^^^^^^^^^^^^^^^^^
 
-.. comp_req:: Linux Platform Support
-   :id: comp_req__time_slave__platform_linux
+.. comp_req:: Platform Support
+   :id: comp_req__time_slave__platform_support
    :reqtype: Functional
    :security: NO
    :safety: QM
@@ -235,31 +252,7 @@ Platform Abstraction
    :version: 1
    :satisfied_by: comp__time_slave
 
-   The time_slave component shall support Linux platforms for Ethernet frame transmission/reception with hardware timestamping and PTP hardware clock control.
-
-.. comp_req:: QNX Platform Support
-   :id: comp_req__time_slave__platform_qnx
-   :reqtype: Functional
-   :security: NO
-   :safety: QM
-   :derived_from: feat_req__time__vehicle_time_sync[version==1]
-   :status: valid
-   :version: 1
-   :satisfied_by: comp__time_slave
-
-   The time_slave component shall support QNX 8.0 SDP platforms for Ethernet frame transmission/reception with hardware timestamping and PTP hardware clock control.
-
-.. comp_req:: Hardware Timestamping
-   :id: comp_req__time_slave__hw_timestamping
-   :reqtype: Functional
-   :security: NO
-   :safety: QM
-   :derived_from: feat_req__time__vehicle_time_sync[version==1]
-   :status: valid
-   :version: 1
-   :satisfied_by: comp__time_slave
-
-   The time_slave component shall attempt to enable hardware timestamping on the network interface during initialization. If the platform does not support hardware timestamping capabilities (detected by ioctl or equivalent platform API failure), The time_slave component shall fall back to software timestamps and log a warning.
+   The time_slave component shall support Linux and QNX 8.0 SDP platforms for Ethernet frame transmission/reception with hardware timestamping and PTP hardware clock control.
 
 Error Handling
 ^^^^^^^^^^^^^^
@@ -289,7 +282,7 @@ Diagnostics and Debugging
    :version: 1
    :satisfied_by: comp__time_slave
 
-   The time_slave component shall provide optional runtime instrumentation to record gPTP synchronization events (Sync reception, peer delay completion, offset thresholds, time leaps) to a CSV file for debugging and diagnostics when enabled via the GptpEngineOptions diagnostics configuration parameter.
+   The time_slave component shall provide optional runtime instrumentation to record gPTP synchronization events (peer delay completion, offset thresholds, time leaps) to a CSV file for debugging and diagnostics when enabled via the GptpEngineOptions diagnostics configuration parameter.
 
 Assumption of Use Requirements
 ------------------------------

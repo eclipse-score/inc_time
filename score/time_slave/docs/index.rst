@@ -38,12 +38,12 @@ Time Slave
 Abstract
 ========
 
-This component implements a gPTP (IEEE 802.1AS) time synchronization slave daemon that receives time synchronization data from network and publishes it to IPC for client applications.
+This component implements a gPTP (IEEE 802.1AS) time synchronization slave daemon that receives time synchronization data from network and sends it via ts_client to the time_daemon for validation.
 
 Specification
 =============
 
-The time_slave component provides IEEE 802.1AS synchronization pipeline that receives gPTP network messages, computes local clock correction values, and publishes synchronized time snapshots via ts_client shared memory IPC.
+The time_slave component provides IEEE 802.1AS synchronization handling, i.e. it receives gPTP network messages from time master, does path delay measurement, computes local clock correction values, and publishes synchronized time snapshots via ts_client shared memory IPC.
 
 Runtime flow follows continuous loop:
 
