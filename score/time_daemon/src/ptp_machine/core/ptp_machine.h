@@ -92,8 +92,8 @@ class PTPMachine final : public PeriodicMachine, public Producer<PtpTimeInfo>
     ///
     /// Invoked at each update interval by the PeriodicMachine worker thread.
     /// Obtains the current time information from the PTP engine and publishes
-    /// it to subscribers. On read failure or uninitialised engine, calls
-    /// @c Deinit() and retries on the next interval.
+    /// it to subscribers. On read failure or uninitialised engine, logs warning
+    /// and returns. @c Deinit() called explicitly in destructor.
     void PeriodicTask() noexcept override;
 
   private:
@@ -136,11 +136,11 @@ bool PTPMachine<PTPEngine>::Init()
 
         if (is_initialized_)
         {
-            score::mw::log::LogInfo(kPtpMachineContext) << "QPTP stack initialized successfully";
+            score::mw::log::LogInfo(kPtpMachineContext) << "PTP stack initialized successfully";
         }
         else
         {
-            score::mw::log::LogError(kPtpMachineContext) << "QPTP stack initialization failed";
+            score::mw::log::LogError(kPtpMachineContext) << "PTP stack initialization failed";
         }
     }
 

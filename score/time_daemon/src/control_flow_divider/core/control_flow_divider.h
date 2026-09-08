@@ -41,8 +41,9 @@ namespace td
 /// If no new data arrives within the specified timeout, it republishes the last known data
 /// to maintain consistent output timing.
 ///
-/// Thread safety: @c OnMessage() called from MessageBroker thread; @c OnEvent() / @c OnTimeout()
-/// called from worker thread. Synchronized via @c data_buffer_mutex_.
+/// Thread safety: @c OnMessage() called from MessageBroker thread; @c OnEvent() called from
+/// worker thread; @c OnTimeout() called from worker thread (accesses @c last_data_ without lock,
+/// safe because only worker thread writes it). @c data_buffer_ synchronized via @c data_buffer_mutex_.
 ///
 /// @tparam DataType  The type of data being processed (e.g. PtpTimeInfo).
 /// @tparam BufferSize The size of the internal circular buffer for incoming data.

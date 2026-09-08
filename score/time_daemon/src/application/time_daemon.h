@@ -26,8 +26,8 @@ namespace td
 /// of all daemon components.
 ///
 /// Retrieves Vehicle Time from the PTP slave daemon, verifies and validates
-/// timepoints, and distributes time to clients via shared memory. Uses
-/// MachineFactory to create components and wire pub/sub relationships via
+/// timepoints, and distributes time to clients via shared memory. Creates
+/// components in @c Initialize() and wires pub/sub relationships via
 /// MessageBroker.
 ///
 /// @see TimebaseHandler

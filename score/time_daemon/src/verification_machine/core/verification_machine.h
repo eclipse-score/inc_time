@@ -88,7 +88,6 @@ class VerificationMachine final : public ReactiveMachine, public Consumer<DataTy
 
     /// @brief Initialize the machine. Stubbed — returns true immediately as no
     /// explicit initialization actions are required.
-
     /// @return true
     bool Init() override;
 

@@ -51,6 +51,8 @@ class MessageBroker : public std::enable_shared_from_this<MessageBroker<T>>
     /// adds it to the topic registry. Uses a weak_ptr to avoid prolonging the
     /// consumer's lifetime.
     ///
+    /// @pre Must be called during the initialization phase to ensure thread safety.
+    ///
     /// @param topic           Topic name to subscribe to.
     /// @param subscriber_weak Weak pointer to the consumer component.
     void AddSubscriber(const Topic& topic, std::weak_ptr<Consumer<T>> subscriber_weak);

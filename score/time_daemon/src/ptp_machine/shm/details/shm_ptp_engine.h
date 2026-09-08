@@ -83,7 +83,7 @@ class ShmPTPEngine final
     ///
     /// All @c GptpIpcData fields mapped 1:1. Unmapped @c PtpTimeInfo fields zero-initialized.
     ///
-    /// @param info Output parameter filled with the converted snapshot.
+    /// @param[out] info Output parameter filled with the converted snapshot.
     /// @return @c true if a valid snapshot was read; @c false otherwise.
     bool ReadPTPSnapshot(PtpTimeInfo& info);
 
