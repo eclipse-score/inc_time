@@ -30,7 +30,7 @@ namespace ts
  *        and publishes time data to shared memory.
  *
  * TimeSlave is the gPTP protocol endpoint. It runs GptpEngine internally
- * (with RxThread + PdelayThread) and periodically writes PtpTimeInfo
+ * (with RxThread + PdelayThread) and periodically writes GptpIpcData
  * to shared memory for consumption by TimeDaemon via ShmPTPEngine.
  */
 class TimeSlave final : public score::mw::lifecycle::Application
