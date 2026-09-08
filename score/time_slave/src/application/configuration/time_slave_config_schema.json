@@ -1,0 +1,94 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://eclipse-score.github.io/score_time/time_slave_config_schema.json",
+    "title": "TimeSlave Configuration",
+    "description": "Runtime configuration for the TimeSlave gPTP process. The same schema is used on both Linux and QNX; QNX-specific options live under the optional 'qnx' key.",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [],
+    "properties": {
+        "iface_name": {
+            "type": "string",
+            "default": "emac0",
+            "description": "Network interface name used for gPTP (e.g. 'emac0' on QNX, 'eth0' on Linux)."
+        },
+        "domain_number": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 127,
+            "default": 0,
+            "description": "gPTP domain number."
+        },
+        "pdelay_req_interval_ms": {
+            "type": "integer",
+            "minimum": 10,
+            "maximum": 60000,
+            "default": 1000,
+            "description": "Interval between Pdelay_Req transmissions in milliseconds (IEEE 1588 logPdelayReqInterval converted to ms for simplicity)."
+        },
+        "pdelay_warmup_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 60000,
+            "default": 2000,
+            "description": "Delay before the first Pdelay_Req after startup in milliseconds."
+        },
+        "sync_timeout_ms": {
+            "type": "integer",
+            "minimum": 10,
+            "maximum": 60000,
+            "default": 3300,
+            "description": "Declare sync loss after this many milliseconds without receiving a Sync/FollowUp."
+        },
+        "jump_future_threshold_ns": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 500000000,
+            "description": "A time jump greater than this (nanoseconds) is detected as a future jump."
+        },
+        "shm_path": {
+            "type": "string",
+            "default": "/gptp_shmem",
+            "description": "Shared-memory path used to publish PTP snapshots for TimeDaemon."
+        },
+        "phc": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "PHC (PTP Hardware Clock) adjustment settings. If omitted, PHC adjustment is disabled.",
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "default": false
+                },
+                "device": {
+                    "type": "string",
+                    "default": "",
+                    "description": "PHC device path. On QNX use the interface name (e.g. 'emac0'); on Linux use the /dev/ptpN path."
+                },
+                "step_threshold_ns": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "default": 100000000,
+                    "description": "Offsets larger than this trigger a step correction (nanoseconds); smaller offsets are slewed."
+                }
+            }
+        },
+        "qnx": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "QNX-specific options. Ignored on Linux.",
+            "properties": {
+                "bpf_device_prefix": {
+                    "type": "string",
+                    "default": "/dev/bpf",
+                    "description": "Path prefix for BPF devices used for raw Ethernet frame capture."
+                },
+                "see_sent": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "If true, sent frames are also delivered to the RX BPF (used for TX timestamp capture)."
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,315 @@
+# *******************************************************************************
+# Copyright (c) 2026 Contributors to the Eclipse Foundation
+#
+# See the NOTICE file(s) distributed with this work for additional
+# information regarding copyright ownership.
+#
+# This program and the accompanying materials are made available under the
+# terms of the Apache License Version 2.0 which is available at
+# https://www.apache.org/licenses/LICENSE-2.0
+#
+# SPDX-License-Identifier: Apache-2.0
+# *******************************************************************************
+
+#############################################
+### SHARED LIBRARIES ###
+#############################################
+/usr/lib/ldqnx-64.so.2=ldqnx-64.so.2   # 64-bit QNX dynamic linker (loads shared libraries)
+
+cam-cdrom.so                             # CAM (Common Access Method) CD-ROM driver
+cam-disk.so                              # CAM disk driver for storage devices
+fs-dos.so                                # DOS file system support
+fs-qnx6.so                               # QNX6 file system support
+io-blk.so                                # Block I/O manager
+libbz2.so.1                              # BZip2 compression library
+libc++.so.2                              # C++ standard library
+libc.so                                  # C standard library (essential)
+libc.so.6                                # Main C library (malloc, printf, file I/O, etc.)
+libcam.so.2                              # CAM library for device access
+libcatalog.so.1                          # Message catalog support
+libcrypto.so.3                           # OpenSSL crypto library
+libexpat.so.2                            # Expat XML parser library
+libfscrypto.so.1                         # File system encryption support
+libfsnotify.so.1                         # File system notification library
+libgcc_s.so.1                            # GCC runtime support library
+libiconv.so.1                            # Character encoding conversion
+libjail.so.1                             # QNX jail library for process containment
+liblzma.so.5                             # LZMA compression library
+libm.so                                  # Math library
+libpam.so.2                              # Pluggable Authentication Modules library
+libpci.so.3.0                            # PCI library v3.0 for hardware access
+libqcrypto.so.1.0                        # QNX cryptographic library
+libqh.so                                 # QNX helper library
+libregex.so.1                            # Regular expression library
+libsecpol.so.1                           # Security policy library
+libslog2.so.1                            # System logging library (slog2_* functions)
+libslog2parse.so.1                       # System log parsing library
+libsocket.so.4                           # Socket library (TCP/IP, UDP, network I/O functions)
+libssl.so.3                              # OpenSSL SSL/TLS library
+libtracelog.so.1                         # Trace logging library
+libxml2.so.2                             # XML parsing library
+libz.so.2                                # Zlib compression library (versioned SONAME required by sshd)
+[type=link] libz.so=libz.so.2            # Version-neutral symlink
+qcrypto-openssl-3.so                     # QNX cryptographic library with OpenSSL 3 support
+
+[type=link] libslog2.so=libslog2.so.1   # Create version-neutral symbolic link
+[type=link] libsocket.so=libsocket.so.4 # Create version-neutral symbolic link
+[type=link] qcrypto-openssl.so=qcrypto-openssl-3.so
+
+
+#############################################
+### Tools ###
+#############################################
+[type=link] /bin/ls=/proc/boot/ls        # Link ls to IFS version for compatibility
+toybox                                   # Minimal Unix utilities collection (replaces many GNU tools)
+[type=link] cp=toybox                    # Copy files and directories
+[type=link] ls=toybox                    # List directory contents
+[type=link] cat=toybox                   # Display file contents
+[type=link] chmod=toybox                 # Change file permissions
+[type=link] rm=toybox                    # Remove files and directories
+[type=link] dd=toybox                    # Convert and copy files with specified I/O block size
+[type=link] echo=toybox                  # Display text
+[type=link] grep=toybox                  # Search text patterns in files
+[type=link] mkdir=toybox                 # Create directories
+[type=link] ascii=toybox                 # Display ASCII character set
+[type=link] base64=toybox                # Base64 encoding/decoding utility
+[type=link] basename=toybox              # Extract filename from path
+[type=link] bc=toybox                    # Basic calculator
+[type=link] bunzip2=toybox               # Decompress bzip2 files
+[type=link] bzcat=toybox                 # Display contents of bzip2 files
+[type=link] cal=toybox                   # Display calendar
+[type=link] chgrp=toybox                 # Change group ownership
+[type=link] chown=toybox                 # Change file ownership
+[type=link] cksum=toybox                 # Calculate checksums
+[type=link] clear=toybox                 # Clear terminal screen
+[type=link] cmp=toybox                   # Compare files byte by byte
+[type=link] comm=toybox                  # Compare sorted files line by line
+[type=link] cpio=toybox                  # Copy files to/from archives
+[type=link] crc32=toybox                 # Calculate CRC32 checksums
+[type=link] cut=toybox                   # Extract columns from files
+[type=link] date=toybox                  # Display or set system date
+[type=link] diff=toybox                  # Compare files line by line
+[type=link] dirname=toybox               # Extract directory from path
+[type=link] dos2unix=toybox              # Convert DOS line endings to Unix
+[type=link] du=toybox                    # Display disk usage
+[type=link] egrep=toybox                 # Extended grep with regular expressions
+[type=link] env=toybox                   # Display or set environment variables
+[type=link] expand=toybox                # Convert tabs to spaces
+[type=link] expr=toybox                  # Evaluate expressions
+[type=link] false=toybox                 # Return false status
+[type=link] fgrep=toybox                 # Fast grep for fixed strings
+[type=link] file=toybox                  # Determine file type
+[type=link] find=toybox                  # Search for files and directories
+[type=link] fmt=toybox                   # Format text paragraphs
+[type=link] groups=toybox                # Display user group membership
+[type=link] gunzip=toybox                # Decompress gzip files
+[type=link] gzip=toybox                  # Compress files with gzip
+[type=link] hd=toybox                    # Hexadecimal dump (alias for hexdump)
+[type=link] head=toybox                  # Display first lines of files
+[type=link] hexdump=toybox               # Display files in hexadecimal format
+[type=link] id=toybox                    # Display user and group IDs
+[type=link] install=toybox               # Copy files and set attributes
+[type=link] link=toybox                  # Create hard links
+[type=link] logname=toybox               # Display login name
+[type=link] md5sum=toybox                # Calculate MD5 checksums
+[type=link] mkfifo=toybox                # Create named pipes (FIFOs)
+[type=link] mktemp=toybox                # Create temporary files/directories
+[type=link] more=toybox                  # Display files page by page
+[type=link] mv=toybox                    # Move/rename files and directories
+[type=link] nl=toybox                    # Number lines in files
+[type=link] nohup=toybox                 # Run commands immune to hangups
+[type=link] od=toybox                    # Dump files in octal format
+[type=link] paste=toybox                 # Merge lines from files
+[type=link] patch=toybox                 # Apply patches to files
+[type=link] printenv=toybox              # Print environment variables
+[type=link] printf=toybox                # Format and print data
+[type=link] pwd=toybox                   # Print working directory
+[type=link] readlink=toybox              # Display target of symbolic links
+[type=link] realpath=toybox              # Display absolute path
+[type=link] rmdir=toybox                 # Remove empty directories
+[type=link] sed=toybox                   # Stream editor for filtering/transforming text
+[type=link] seq=toybox                   # Generate sequences of numbers
+[type=link] sha1sum=toybox               # Calculate SHA1 checksums
+[type=link] sleep=toybox                 # Suspend execution for specified time
+[type=link] sort=toybox                  # Sort lines in text files
+[type=link] split=toybox                 # Split files into pieces
+[type=link] stat=toybox                  # Display file/filesystem status
+[type=link] strings=toybox               # Extract printable strings from files
+[type=link] tail=toybox                  # Display last lines of files
+[type=link] tee=toybox                   # Copy input to files and stdout
+[type=link] test=toybox                  # Evaluate conditional expressions
+[type=link] time=toybox                  # Time command execution
+[type=link] timeout=toybox               # Run command with time limit
+[type=link] touch=toybox                 # Update file timestamps
+[type=link] tr=toybox                    # Translate or delete characters
+[type=link] true=toybox                  # Return true status
+[type=link] truncate=toybox              # Truncate files to specified size
+[type=link] tty=toybox                   # Display terminal name
+[type=link] uname=toybox                 # Display system information
+[type=link] uniq=toybox                  # Remove duplicate lines
+[type=link] unix2dos=toybox              # Convert Unix line endings to DOS
+[type=link] unlink=toybox                # Remove files (system call interface)
+[type=link] uudecode=toybox              # Decode uuencoded files
+[type=link] uuencode=toybox              # Encode files using uuencoding
+[type=link] uuidgen=toybox               # Generate UUIDs
+[type=link] wc=toybox                    # Count lines, words, and characters
+[type=link] which=toybox                 # Locate commands in PATH
+[type=link] whoami=toybox                # Display current username
+[type=link] xargs=toybox                 # Execute commands from standard input
+[type=link] xxd=toybox                   # Make hexdump or reverse
+[type=link] yes=toybox                   # Output string repeatedly
+[type=link] zcat=toybox                  # Display contents of compressed files
+[type=link] nc=toybox                    # Netcat for network connections and packet streaming
+[type=link] netcat=toybox                # Netcat alias for network connections
+[type=link] pkill=slay                   # Process killer Linux compatibility layer
+
+[type=link] waitfor=on                  # Create symbolic link: waitfor -> on (waits for resources to become available)
+[type=link] ability=on                  # Create symbolic link: ability -> on (manages process abilities/privileges)
+[type=link] /bin/sh=/proc/boot/ksh      # Create symbolic link: sh -> ksh (standard shell link)
+[type=link] setconf=getconf             # Create symbolic link: setconf -> getconf (sets configuration parameters)
+
+awk                 # Text processing and pattern scanning
+devb-eide           # Block device driver for IDE/SATA hard drives and SSDs
+devb-ram            # RAM disk block device manager
+devc-pty            # Pseudo-terminal device manager
+devc-ser8250        # Serial port driver for 8250/16550 UART controllers (console access)
+dhcpcd              # DHCP client daemon for automatic network configuration
+fsencrypt           # File system encryption utility
+fsevmgr             # File system event manager
+getconf             # System configuration query utility - retrieves system parameters
+hostname            # Set or display system hostname
+if_up               # Network interface configuration
+ifconfig            # Network interface configuration tool
+ksh                 # Korn shell - provides command-line interface and scripting
+ln                  # Create file links
+mkqnx6fs            # Create QNX6 file systems
+mount               # File system mount utility - mounts/unmounts file systems
+mount_ifs           # Mount Image File System (IFS)
+mqueue              # POSIX message queue manager
+on                  # Command execution utility - runs commands with specific options
+openssl             # SSL/TLS cryptographic toolkit
+pci-server          # PCI bus server
+pdebug              # Process debugger
+pfctl               # Packet filter control utility
+pidin               # Process information display - shows running processes (like 'ps' on Linux)
+pipe                # Named pipe manager
+random              # Random number generator service
+route               # Network routing table management utility
+shutdown            # System shutdown utility
+slay                # Process termination utility
+slog2info           # System log viewer - displays logged messages
+slogger2            # System logging daemon - collects and manages log messages
+ssh                 # SSH client for remote connections
+ssh-keygen          # SSH key generation utility
+sshd                # SSH daemon for remote access
+ptpd2               # IEEE 1588 PTP daemon for the QNX E2E master
+/usr/libexec/sshd-session=${QNX_TARGET}/${PROCESSOR}/usr/libexec/sshd-session  # SSH session handler (required by sshd)
+sync                # Synchronize file system buffers to disk
+sysctl              # Configure kernel parameters at runtime
+tar                 # Archive utility for creating/extracting tar files
+tcpdump             # Network packet capture tool for Wireshark analysis
+umount              # Unmount file systems
+
+/usr/lib/ssh/sftp-server=${QNX_TARGET}/${PROCESSOR}/usr/libexec/sftp-server     # File transfer server to enable scp
+
+
+#############################################
+### NETWORKING COMPONENTS ###
+#############################################
+io-sock                                  # Network socket manager
+mods-pci.so                              # PCI module support for network hardware
+mods-phy.so                              # Physical layer module for network interfaces
+mods-usb.so                              # USB module support
+libfdt.so.1                              # Flattened Device Tree library
+libusbdci.so.2                           # USB device controller interface library
+devs-vtnet_pci.so                        # VirtIO network device driver for QEMU/KVM
+librpc.so.2                              # For TCP dump
+
+
+#############################################
+### PCI COMPONENTS ###
+#############################################
+# PCI-related shared libraries and modules
+pci/pci_hw-Intel_x86.so                  # Intel x86 PCI hardware support
+pci/pci_slog2.so                         # PCI system logging support
+pci/pci_cap-0x05.so                      # PCI capability handler for MSI
+pci/pci_cap-0x10.so                      # PCI Express capability handler
+pci/pci_cap-0x11.so                      # MSI-X capability handler
+pci/pci_strings.so                       # PCI device string database
+pci/pci_bkwd_compat.so                   # Backward compatibility support
+pci/pci_debug2.so                        # Enhanced PCI debugging support
+
+
+#############################################
+### SYSTEM DIRECTORIES ###
+#############################################
+# Create SSH and system directories with appropriate permissions
+[gid=0 uid=0 dperms=755 type=dir] /var/chroot/sshd              # SSH chroot directory for privilege separation
+[gid=0 uid=0 dperms=700 type=dir] /var/ssh                      # SSH configuration and key storage directory
+[gid=0 uid=0 dperms=755 type=dir] /usr/bin                      # Directory for SUT binaries
+[gid=0 uid=0 dperms=755 type=dir] /usr/sbin                     # Directory for system daemons (e.g. ptpd2)
+
+[perms=0444] pci_server.cfg = {
+[buscfg]
+DO_BUS_CONFIG=no
+
+[envars]
+PCI_DEBUG_MODULE=pci_debug2.so
+PCI_HW_MODULE=pci_hw-Intel_x86.so
+PCI_HW_CONFIG_FILE=/proc/boot/pci_hw.cfg
+}
+
+[perms=0444] pci_hw.cfg = {
+[interrupts]
+B0:D17:F0    A    18
+B0:D17:F0    B    19
+B0:D17:F0    C    16
+B0:D17:F0    D    17
+B3:D0:F0     A    18
+B3:D0:F0     B    19
+B3:D0:F0     C    16
+B3:D0:F0     D    17
+}
+
+[uid=0 gid=0 perms=0444] qcrypto.conf = {
+openssl tags=*
+}
+
+[uid=0 gid=0 perms=0444] /etc/passwd = {
+root::0:0:Superuser:/:/bin/sh
+qnxuser::1000:1000:QNX User:/:/bin/sh
+sshd::15:6:sshd:/:/bin/false
+}
+
+[uid=0 gid=0 perms=0444] /etc/group = {
+root::0:root
+qnxuser::1000:qnxuser
+sshd::6:sshd
+}
+
+[uid=0 gid=0 perms=0444] /etc/profile = {
+export TERM=qansi
+export PATH=/proc/boot:/usr/bin:/usr/sbin
+export LD_LIBRARY_PATH=/proc/boot:/usr/lib
+export MAGIC=/system/etc/magic
+}
+
+[uid=0 gid=0 perms=0444] /var/ssh/sshd_config = {
+Port 22
+AddressFamily inet
+ListenAddress 0.0.0.0
+HostKey /tmp_ram/ssh/ssh_host_rsa_key
+Subsystem sftp /usr/lib/ssh/sftp-server
+PasswordAuthentication yes
+PermitEmptyPasswords yes
+PermitRootLogin yes
+PermitUserEnvironment yes
+StrictModes no
+UseDNS no
+MaxAuthTries 6
+MaxStartups 100:30:200
+LoginGraceTime 60
+AllowTcpForwarding yes
+PidFile none
+LogLevel DEBUG
+}

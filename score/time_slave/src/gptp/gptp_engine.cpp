@@ -209,7 +209,7 @@ void GptpEngine::PdelayLoop() noexcept
     next.tv_nsec = static_cast<long>(next_warmup_ns % 1'000'000'000LL);
 
     const std::int64_t interval_ns =
-        static_cast<std::int64_t>(opts_.pdelay_interval_ms > 0 ? opts_.pdelay_interval_ms : 1000) * 1'000'000LL;
+        static_cast<std::int64_t>(opts_.pdelay_req_interval_ms > 0 ? opts_.pdelay_req_interval_ms : 1000) * 1'000'000LL;
 
     while (running_.load(std::memory_order_acquire))
     {
