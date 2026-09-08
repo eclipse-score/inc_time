@@ -53,6 +53,7 @@ use_repo(
     "score_gcc_x86_64_toolchain",
     "score_qcc_aarch64_toolchain",
     "score_qcc_x86_64_toolchain",
+    "score_qcc_x86_64_toolchain_pkg",
 )
 
 ## Custom Module Loading
@@ -215,3 +216,49 @@ pip.parse(
     requirements_lock = "//third_party/codeql:requirements_lock.txt",
 )
 use_repo(pip, "codeql_coding_standards_pip_hub")
+## Integration Test Framework dependencies
+
+bazel_dep(name = "score_itf", version = "0.5.0", dev_dependency = True)
+bazel_dep(name = "bazel_skylib", version = "1.9.0", dev_dependency = True)
+bazel_dep(name = "rules_pkg", version = "1.2.0", dev_dependency = True)
+bazel_dep(name = "rules_oci", version = "2.2.7", dev_dependency = True)
+
+oci = use_extension("@rules_oci//oci:extensions.bzl", "oci", dev_dependency = True)
+oci.pull(
+    name = "ubuntu_24_04",
+    digest = "sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30",
+    image = "ubuntu",
+    platforms = ["linux/amd64"],
+    tag = "24.04",
+)
+use_repo(oci, "ubuntu_24_04", "ubuntu_24_04_linux_amd64")
+
+bazel_dep(name = "score_rules_imagefs", version = "0.0.3", dev_dependency = True)
+
+imagefs = use_extension("@score_rules_imagefs//extensions:imagefs.bzl", "imagefs", dev_dependency = True)
+imagefs.toolchain(
+    name = "score_qnx_x86_64_ifs_toolchain",
+    sdp_to_import = "@score_qcc_x86_64_toolchain_pkg",
+    # imagefs extension does not remap 8.0.4 -> 8.0.0 for platform constraints,
+    # so use "8.0.0" here to match the only available sdp_version constraint
+    # value in @score_bazel_platforms. The actual SDP binary version comes
+    # from sdp_to_import (8.0.4).
+    sdp_version = "8.0.0",
+    target_cpu = "x86_64",
+    target_os = "qnx",
+    type = "ifs",
+)
+use_repo(imagefs, "score_qnx_x86_64_ifs_toolchain")
+
+## JSON Schema validation (build-time lint)
+
+bazel_dep(name = "nlohmann_json", version = "3.11.3", dev_dependency = True)
+
+http_archive(
+    name = "json_schema_validator",
+    build_file = "//third_party/json_schema_validator:json_schema_validator.BUILD",
+    dev_dependency = True,
+    integrity = "sha256-g/YdgRL0heDT8ectUWELo5JLF5kmqDdq7zwDh3D68gI=",
+    strip_prefix = "json-schema-validator-2.1.0",
+    urls = ["https://github.com/pboettch/json-schema-validator/archive/refs/tags/2.1.0.tar.gz"],
+)
