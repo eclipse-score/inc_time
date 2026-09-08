@@ -60,7 +60,7 @@ use_repo(
 ### Public modules
 
 bazel_dep(name = "platforms", version = "1.0.0")
-bazel_dep(name = "score_bazel_platforms", version = "1.0.0")
+bazel_dep(name = "score_bazel_platforms", version = "1.1.0")
 bazel_dep(name = "score_logging", version = "0.2.2")
 
 ### Modules that are used internally within the repository but not exposed as part of the public API
@@ -100,7 +100,7 @@ bazel_dep(name = "buildifier_prebuilt", version = "8.5.1", dev_dependency = True
 
 bazel_dep(name = "score_baselibs", version = "0.2.12")
 bazel_dep(name = "score_communication", version = "0.4.0")
-bazel_dep(name = "score_lifecycle", version = "0.5.0")
+bazel_dep(name = "score_lifecycle", version = "0.6.0")
 
 # LLVM toolchain — provides @llvm_toolchain//:clang-tidy for the clang-tidy aspect.
 llvm = use_extension(

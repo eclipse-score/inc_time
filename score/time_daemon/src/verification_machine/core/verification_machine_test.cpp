@@ -118,5 +118,34 @@ TEST_F(VerificationMachineTest, DataFlowVerification)
     EXPECT_EQ(actualData.data[9], expectedDataStage3);
 }
 
+TEST_F(VerificationMachineTest, InitReturnsTrue)
+{
+    auto stage = std::make_unique<VerificationStageMock>();
+
+    VerificationMachine<ValidatorMockData> verificationMachine("TestMachine", [&stage]() mutable {
+        return std::move(stage);
+    });
+
+    EXPECT_TRUE(verificationMachine.Init());
+}
+
+class VerificationMachineDeathTest : public ::testing::Test
+{
+};
+
+TEST_F(VerificationMachineDeathTest, ConstructionWithNoFactoriesAborts)
+{
+    ASSERT_DEATH((VerificationMachine<ValidatorMockData>("TestMachine")), "");
+}
+
+TEST_F(VerificationMachineDeathTest, FactoryReturningNullptrAborts)
+{
+    ASSERT_DEATH((VerificationMachine<ValidatorMockData>("TestMachine",
+                                                         []() -> std::unique_ptr<VerificationStage<ValidatorMockData>> {
+                                                             return nullptr;
+                                                         })),
+                 "");
+}
+
 }  // namespace td
 }  // namespace score

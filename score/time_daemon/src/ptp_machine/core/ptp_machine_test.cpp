@@ -122,5 +122,53 @@ TEST_F(PTPMachineTest, DataFlowTest)
     }
 }
 
+TEST_F(PTPMachineTest, PeriodicTaskSkipsSnapshotReadWhenNotInitialized)
+{
+    // Asserts behavior only; the Fatal log this guard also emits isn't checked here.
+    EXPECT_CALL(*testing::PTPEngineMockProvider::GetInstance().GetMock(), ReadPTPSnapshot(_)).Times(0);
+
+    machine_->Start();
+
+    auto future = promise_data_published_.get_future();
+    EXPECT_TRUE(future.wait_for(std::chrono::milliseconds(150)) == std::future_status::timeout);
+}
+
+TEST_F(PTPMachineTest, PeriodicTaskDoesNotPublishWhenSnapshotReadFails)
+{
+    // Same caveat: asserts no-publish, not the Warn log.
+    EXPECT_CALL(*testing::PTPEngineMockProvider::GetInstance().GetMock(), Initialize())
+        .Times(Exactly(1))
+        .WillOnce(Return(true));
+
+    EXPECT_CALL(*testing::PTPEngineMockProvider::GetInstance().GetMock(), ReadPTPSnapshot(_))
+        .WillRepeatedly(Return(false));
+
+    machine_->Init();
+    machine_->Start();
+
+    auto future = promise_data_published_.get_future();
+    EXPECT_TRUE(future.wait_for(std::chrono::milliseconds(150)) == std::future_status::timeout);
+}
+
+TEST(PTPMachineStandaloneTest, PublishWithoutCallbackDoesNotCrash)
+{
+    PTPMachine<testing::FakePTPEngine> machine("PTPMachineNoCallback", 100ms);
+
+    EXPECT_CALL(*testing::PTPEngineMockProvider::GetInstance().GetMock(), Initialize())
+        .Times(Exactly(1))
+        .WillOnce(Return(true));
+
+    EXPECT_CALL(*testing::PTPEngineMockProvider::GetInstance().GetMock(), ReadPTPSnapshot(_))
+        .Times(::testing::AtLeast(1))
+        .WillRepeatedly(Return(true));
+
+    machine.Init();
+    machine.Start();
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(150));
+
+    machine.Stop();
+}
+
 }  // namespace td
 }  // namespace score

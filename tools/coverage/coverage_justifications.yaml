@@ -70,3 +70,53 @@ justifications:
     locations:
       - file: score/time_daemon/src/verification_machine/svt/validators/time_jumps_validator.cpp
         lines: [172, 173]
+
+  - id: time-jumps-validator-processing-state-default
+    category: defensive_programming
+    platforms: [linux, qnx]
+    reason: >
+      Default case in switch over ProcessingStates, a private enum with exactly three values (kIdle, kInitialSyncDebouncing, kTimeJumpHandling), all of which are explicitly handled above. Kept as defensive programming against future enum additions.
+    locations:
+      - file: score/time_daemon/src/verification_machine/svt/validators/time_jumps_validator.cpp
+        lines: [51, 52]
+
+  - id: msg-broker-empty-subscription-callback-guard
+    category: defensive_programming
+    platforms: [linux, qnx]
+    reason: >
+      Guard against an empty Subscription callback in MessageBroker::Publish. Subscribe() is private and only ever invoked by AddSubscriber(), which always constructs the Subscription with a populated callback lambda. There is no public API path that can insert a Subscription with an empty callback_, making the false branch unreachable through normal use. Kept as defensive programming against future internal callers of Subscribe().
+    locations:
+      - file: score/time_daemon/src/msg_broker/msg_broker.h
+        lines: [90]
+
+  - id: verification-machine-pipeline-null-guard
+    category: defensive_programming
+    platforms: [linux, qnx]
+    reason: >
+      Guard against ProcessMessage() being called before the pipeline is set up. The only constructor of VerificationMachine unconditionally calls SetupPipeline() before the object is usable, and SetupPipeline() itself asserts on empty/invalid factories, so pipeline_ is always non-null by the time ProcessMessage()/ OnMessage() can be invoked through the public API. There is no way to reach this assertion-fails branch without modifying the class. Kept as defensive programming against future internal callers of ProcessMessage().
+    locations:
+      - file: score/time_daemon/src/verification_machine/core/verification_machine.h
+        lines: [172, 173]
+
+  - id: ptp-time-info-printto-gtest-hook
+    category: other
+    platforms: [linux, qnx]
+    reason: >
+      PrintTo(..., std::ostream*) is the exact signature GTest looks up via ADL to render a value when a comparison assertion on that type fails; no application code calls this overload. The templated PrintTo/operator<< these delegate to (in the header) already has real production coverage via score::mw::log call sites (e.g. TimeJumpsValidator streaming SyncFupData), so only this GTest-only overload is otherwise unreachable without an assertion actually failing.
+    locations:
+      - file: score/time_daemon/src/common/data_types/ptp_time_info.cpp
+        line_start: 116
+        line_end: 134
+
+  - id: svt-time-info-print-stream-unused
+    category: other
+    platforms: [linux, qnx]
+    reason: >
+      PrintTo/operator<< for the svt IPC snapshot types exist only as debug-printing/GTest-compatibility infrastructure. Unlike ptp_time_info.h's equivalents, no production code anywhere logs or streams these svt types, so none of this (templated or GTest-only overload) is ever exercised outside of GTest's failure-printing path, which none of the current assertions trigger.
+    locations:
+      - file: score/time_daemon/src/ipc/svt/svt_time_info.h
+        line_start: 113
+        line_end: 168
+      - file: score/time_daemon/src/ipc/svt/svt_time_info.cpp
+        line_start: 206
+        line_end: 224
