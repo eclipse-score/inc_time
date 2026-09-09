@@ -172,22 +172,6 @@ Platform Abstraction
 
    The ts_client component shall support POSIX and QNX 8.0 SDP platforms for shared memory operations and inter-process communication.
 
-
-Error Handling
-^^^^^^^^^^^^^^
-
-.. comp_req:: Error Reporting
-   :id: comp_req__ts_client__error_reporting
-   :reqtype: Functional
-   :security: NO
-   :safety: QM
-   :derived_from: feat_req__time__vehicle_time_sync_log[version==1]
-   :status: valid
-   :version: 1
-   :satisfied_by: comp__ts_client
-
-   The ts_client component shall log messages via the score::mw::log interface when shared memory operations fail (error level), validation errors occur (error level), or channel creation/opening fails (error level).
-
 Non-Functional Requirements
 ---------------------------
 
