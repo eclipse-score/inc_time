@@ -259,7 +259,7 @@ Platform Abstraction
    :version: 1
    :satisfied_by: comp__time_daemon
 
-   The time_daemon component shall support Linux and QNX 8.0 SDPplatforms for shared memory access and IPC communication.
+   The time_daemon component shall support POSIX and QNX 8.0 SDPplatforms for shared memory access and IPC communication.
 
 Assumption of Use Requirements
 -------------------------------
