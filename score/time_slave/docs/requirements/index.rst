@@ -173,7 +173,7 @@ gPTP Message Processing
    The time_slave component shall receive IEEE 802.1AS PDelayResp messages in response to transmitted PDelayReq messages and extract the requestReceiptTimestamp from the message.
 
 .. comp_req:: PDelayRespFollowUp Message Reception
-   :id: comp_req__time_slave__pdelay_resp_followup_reception
+   :id: comp_req__time_slave__pdelay_resp_fu_rx
    :reqtype: Functional
    :security: NO
    :safety: QM
