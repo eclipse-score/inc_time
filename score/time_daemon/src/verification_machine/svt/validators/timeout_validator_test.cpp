@@ -114,5 +114,37 @@ TEST_P(TimeoutValidatorParamTest, ValidationTest)
     }
 }
 
+TEST(TimeoutValidatorTest, LogsErrorWhenClockAppearsToGoBackward)
+{
+    auto mock = std::make_shared<score::time::HighResSteadyClockBackendMock>();
+
+    TimeoutValidator validator(score::time::test_utils::ClockTestFactory<score::time::HighResSteadyTime>::Make(mock),
+                               std::chrono::nanoseconds{3'300'000'000});
+
+    SyncFupData in_sync_data{};
+    in_sync_data.sequence_id = 1U;
+    std::chrono::nanoseconds cur_ptp_time{0};
+    PtpTimeInfo::ReferenceClock::time_point cur_local_time{std::chrono::nanoseconds{0}};
+    PtpTimeInfo in_data = {cur_ptp_time, cur_local_time, 0, {}, in_sync_data, {}};
+
+    // First call: new frame -> records reception_time_ at 1'000'000'000 ns.
+    EXPECT_CALL(*mock, Now())
+        .WillOnce(::testing::Return(
+            score::time::ClockSnapshot<score::time::HighResSteadyTime::Timepoint, score::time::NoStatus>{
+                score::time::HighResSteadyTime::Timepoint{std::chrono::nanoseconds{1'000'000'000}}, {}}));
+    auto first_result = validator.Process(in_data);
+    EXPECT_FALSE(first_result.status.is_timeout);
+
+    // Second call: same sequence id (no new frame), so timeout is checked -> but the clock now
+    // reports a time earlier than the recorded reception_time_, exercising the defensive
+    // "current time is less than reception time" branch instead of the normal timeout check.
+    EXPECT_CALL(*mock, Now())
+        .WillOnce(::testing::Return(
+            score::time::ClockSnapshot<score::time::HighResSteadyTime::Timepoint, score::time::NoStatus>{
+                score::time::HighResSteadyTime::Timepoint{std::chrono::nanoseconds{900'000'000}}, {}}));
+    auto second_result = validator.Process(in_data);
+    EXPECT_FALSE(second_result.status.is_timeout);
+}
+
 }  // namespace td
 }  // namespace score

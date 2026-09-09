@@ -100,5 +100,137 @@ TEST_P(TimeJumpsValidatorParamTest, ValidationTest)
     }
 }
 
+TEST(TimeJumpsValidatorTest, JumpToPastWithinThresholdIsNotFlagged)
+{
+    auto mock = std::make_shared<score::time::HighResSteadyClockBackendMock>();
+
+    TimeJumpsValidator validator(score::time::test_utils::ClockTestFactory<score::time::HighResSteadyTime>::Make(mock),
+                                 std::chrono::nanoseconds(500'000),
+                                 std::chrono::nanoseconds(5'000'000),
+                                 2U);
+
+    // Pass synchronized state debouncing
+    EXPECT_CALL(*mock, Now())
+        .WillOnce(::testing::Return(
+            score::time::ClockSnapshot<score::time::HighResSteadyTime::Timepoint, score::time::NoStatus>{
+                score::time::HighResSteadyTime::Timepoint{std::chrono::nanoseconds(0)}, {}}))
+        .WillOnce(::testing::Return(
+            score::time::ClockSnapshot<score::time::HighResSteadyTime::Timepoint, score::time::NoStatus>{
+                score::time::HighResSteadyTime::Timepoint{std::chrono::nanoseconds(6'000'000'000)}, {}}));
+
+    PtpTimeInfo entry_data{};
+    entry_data.status.is_synchronized = true;
+    std::ignore = validator.Process(entry_data);
+    std::ignore = validator.Process(entry_data);
+
+    SyncFupData baseline_sync{};
+    baseline_sync.sequence_id = 0U;
+    baseline_sync.precise_origin_timestamp = 1'000'000'000ULL;
+    baseline_sync.sync_ingress_timestamp = 1'000'000'000ULL;
+    PtpTimeInfo baseline_data{};
+    baseline_data.sync_fup_data = baseline_sync;
+    std::ignore = validator.Process(baseline_data);
+
+    // predicted_origin = last_t1 + t2_diff = 1'000'000'000 + 125'000'000 = 1'125'000'000
+    // current_jump_to_past = predicted_origin - current_t1 = 100'000, which is <= the 500'000 threshold
+    SyncFupData next_sync{};
+    next_sync.sequence_id = 1U;
+    next_sync.precise_origin_timestamp = 1'124'900'000ULL;
+    next_sync.sync_ingress_timestamp = 1'125'000'000ULL;
+    PtpTimeInfo next_data{};
+    next_data.sync_fup_data = next_sync;
+
+    auto result = validator.Process(next_data);
+
+    EXPECT_FALSE(result.status.is_time_jump_past);
+    EXPECT_FALSE(result.status.is_time_jump_future);
+}
+
+TEST(TimeJumpsValidatorTest, JumpToFutureWithinThresholdIsNotFlagged)
+{
+    auto mock = std::make_shared<score::time::HighResSteadyClockBackendMock>();
+
+    TimeJumpsValidator validator(score::time::test_utils::ClockTestFactory<score::time::HighResSteadyTime>::Make(mock),
+                                 std::chrono::nanoseconds(500'000),
+                                 std::chrono::nanoseconds(5'000'000),
+                                 2U);
+
+    // Pass synchronized state debouncing
+    EXPECT_CALL(*mock, Now())
+        .WillOnce(::testing::Return(
+            score::time::ClockSnapshot<score::time::HighResSteadyTime::Timepoint, score::time::NoStatus>{
+                score::time::HighResSteadyTime::Timepoint{std::chrono::nanoseconds(0)}, {}}))
+        .WillOnce(::testing::Return(
+            score::time::ClockSnapshot<score::time::HighResSteadyTime::Timepoint, score::time::NoStatus>{
+                score::time::HighResSteadyTime::Timepoint{std::chrono::nanoseconds(6'000'000'000)}, {}}));
+
+    PtpTimeInfo entry_data{};
+    entry_data.status.is_synchronized = true;
+    std::ignore = validator.Process(entry_data);
+    std::ignore = validator.Process(entry_data);
+
+    SyncFupData baseline_sync{};
+    baseline_sync.sequence_id = 0U;
+    baseline_sync.precise_origin_timestamp = 1'000'000'000ULL;
+    baseline_sync.sync_ingress_timestamp = 1'000'000'000ULL;
+    PtpTimeInfo baseline_data{};
+    baseline_data.sync_fup_data = baseline_sync;
+    std::ignore = validator.Process(baseline_data);
+
+    // predicted_origin = last_t1 + t2_diff = 1'000'000'000 + 125'000'000 = 1'125'000'000
+    // current_jump_to_future = current_t1 - predicted_origin = 100'000, which is <= the 500'000 threshold
+    SyncFupData next_sync{};
+    next_sync.sequence_id = 1U;
+    next_sync.precise_origin_timestamp = 1'125'100'000ULL;
+    next_sync.sync_ingress_timestamp = 1'125'000'000ULL;
+    PtpTimeInfo next_data{};
+    next_data.sync_fup_data = next_sync;
+
+    auto result = validator.Process(next_data);
+
+    EXPECT_FALSE(result.status.is_time_jump_past);
+    EXPECT_FALSE(result.status.is_time_jump_future);
+}
+
+TEST(TimeJumpsValidatorTest, StaysInInitialSyncDebouncingWhenThresholdNotElapsed)
+{
+    auto mock = std::make_shared<score::time::HighResSteadyClockBackendMock>();
+
+    TimeJumpsValidator validator(score::time::test_utils::ClockTestFactory<score::time::HighResSteadyTime>::Make(mock),
+                                 std::chrono::nanoseconds(500'000),
+                                 std::chrono::nanoseconds(5'000'000),
+                                 2U);
+
+    EXPECT_CALL(*mock, Now())
+        // Enter kInitialSyncDebouncing
+        .WillOnce(::testing::Return(
+            score::time::ClockSnapshot<score::time::HighResSteadyTime::Timepoint, score::time::NoStatus>{
+                score::time::HighResSteadyTime::Timepoint{std::chrono::nanoseconds(0)}, {}}))
+        // Debounce threshold (5'000'000 ns) not yet elapsed -> stays in kInitialSyncDebouncing
+        .WillOnce(::testing::Return(
+            score::time::ClockSnapshot<score::time::HighResSteadyTime::Timepoint, score::time::NoStatus>{
+                score::time::HighResSteadyTime::Timepoint{std::chrono::nanoseconds(2'000'000)}, {}}))
+        // Debounce threshold elapsed -> transitions to kTimeJumpHandling
+        .WillOnce(::testing::Return(
+            score::time::ClockSnapshot<score::time::HighResSteadyTime::Timepoint, score::time::NoStatus>{
+                score::time::HighResSteadyTime::Timepoint{std::chrono::nanoseconds(6'000'000'000)}, {}}));
+
+    PtpTimeInfo entry_data{};
+    entry_data.status.is_synchronized = true;
+    std::ignore = validator.Process(entry_data);
+    std::ignore = validator.Process(entry_data);
+    std::ignore = validator.Process(entry_data);
+
+    SyncFupData first_sync{};
+    first_sync.sequence_id = 0U;
+    PtpTimeInfo first_data{};
+    first_data.sync_fup_data = first_sync;
+
+    auto result = validator.Process(first_data);
+
+    EXPECT_FALSE(result.status.is_time_jump_future);
+    EXPECT_FALSE(result.status.is_time_jump_past);
+}
+
 }  // namespace td
 }  // namespace score
