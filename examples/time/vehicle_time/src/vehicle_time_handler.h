@@ -109,9 +109,9 @@ class VehicleTimeHandler
 
     /// @brief Registers a callback that is invoked when VehicleTimeStatus flags change.
     ///
-    /// @note Delivery is not yet implemented in the backend.  The callback can
-    ///       be registered now; it will be invoked once background-thread
-    ///       delivery is wired up in a future change.
+    /// The callback fires once with the current status right after registration and
+    /// afterwards whenever the status flags change.  It is invoked on the backend's
+    /// worker thread, so the callback implementation must be thread-safe.
     void RegisterStatusCallback(score::time::VehicleTime::StatusChangedCallback callback) noexcept
     {
         clock_.Subscribe<score::time::VehicleTimeStatus>(std::move(callback));

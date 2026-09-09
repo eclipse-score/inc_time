@@ -434,12 +434,11 @@ diagnostics and PTP data sanity checks:
 
    </div>
 
-.. warning::
-
-   Both PTP data callbacks (``TimeSlaveSyncData`` and ``PDelayMeasurementData``) are
-   **not yet delivered**.  Calling ``Subscribe<...>()`` compiles and runs without error,
-   but the registered callbacks will never be invoked.  Delivery will be wired from a
-   dedicated background thread in a future change.
+Delivery is performed by a dedicated worker thread owned by the ``VehicleTime`` backend.
+The TimeDaemon publishes into a shared-memory segment without a notification facility, so
+the worker polls that segment at a fixed interval (50 ms) while at least one callback is
+registered and dispatches every frame whose sync or pDelay content changed.  The frame that
+is already present at registration time forms the baseline and is not delivered.
 
 .. code-block:: cpp
 
@@ -496,13 +495,6 @@ excluded from the comparison.
 .. raw:: html
 
    </div>
-
-.. warning::
-
-   The ``VehicleTimeStatus`` callback is **not yet delivered**.  Calling
-   ``Subscribe<VehicleTimeStatus>()`` compiles and runs without error, but the registered
-   callback will never be invoked.  Delivery will be wired from a dedicated background
-   thread in a future change.
 
 .. code-block:: cpp
 

@@ -59,31 +59,50 @@ class VehicleClockBackend
                                     std::chrono::steady_clock::time_point until) const noexcept = 0;
 
     /// \brief Installs the callback invoked when new time-sync data arrives.
+    ///
+    /// Fires once for every new Sync/Follow-Up frame received from the TimeDaemon after
+    /// registration.  Invoked on the backend's dedicated worker thread.
+    ///
+    /// Replacing an installed callback is safe while an invocation is in flight: the call
+    /// returns only once the previous callback is no longer running (unless made from
+    /// within that callback itself).
     virtual void SetTimeSlaveSyncDataReceivedCallback(
         VehicleTime::TimeSlaveSyncDataReceivedCallback&& callback) noexcept = 0;
 
     /// \brief Removes the time-sync data callback.
+    ///
+    /// Returns only once an in-flight invocation has completed (unless called from within
+    /// the callback itself), so callers may release captured resources afterwards.
     virtual void UnsetTimeSlaveSyncDataReceivedCallback() noexcept = 0;
 
     /// \brief Installs the callback invoked after a finished pDelay measurement.
+    ///
+    /// Fires once for every new pDelay measurement result received from the TimeDaemon after
+    /// registration.  Invoked on the backend's dedicated worker thread.  Same replacement
+    /// guarantees as \c SetTimeSlaveSyncDataReceivedCallback().
     virtual void SetPDelayMeasurementFinishedCallback(
         VehicleTime::PDelayMeasurementFinishedCallback&& callback) noexcept = 0;
 
     /// \brief Removes the pDelay measurement callback.
+    ///
+    /// Same completion guarantee as \c UnsetTimeSlaveSyncDataReceivedCallback().
     virtual void UnsetPDelayMeasurementFinishedCallback() noexcept = 0;
 
     /// \brief Installs the callback invoked when VehicleTimeStatus flags change.
     ///
     /// The callback fires:
-    ///  - unconditionally on the first \c Now() call after registration; and
-    ///  - on every subsequent \c Now() call where the status flags differ from
-    ///    the last fired value (rate deviation is ignored for comparison).
+    ///  - unconditionally on the first status frame received after registration; and
+    ///  - afterwards only when the status flags differ from the last delivered value
+    ///    (rate deviation is ignored for comparison).
     ///
-    /// The callback is invoked on the thread that calls \c Now() — typically
-    /// a background polling thread.  The implementation must be thread-safe.
+    /// The callback is invoked on the backend's dedicated worker thread — the callback
+    /// implementation must be thread-safe.  Same replacement guarantees as
+    /// \c SetTimeSlaveSyncDataReceivedCallback().
     virtual void SetStatusChangedCallback(VehicleTime::StatusChangedCallback&& callback) noexcept = 0;
 
     /// \brief Removes the status-changed callback.
+    ///
+    /// Same completion guarantee as \c UnsetTimeSlaveSyncDataReceivedCallback().
     virtual void UnsetStatusChangedCallback() noexcept = 0;
 };
 
