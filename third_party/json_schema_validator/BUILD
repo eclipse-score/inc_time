@@ -10,10 +10,3 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 # *******************************************************************************
-
-# Makes tools/lint/ a Bazel package so linters.bzl can be referenced as a
-# label target (//tools/lint:linters.bzl%clang_tidy_aspect) in .bazelrc.
-exports_files([
-    "json_schema_validator.bzl",
-    "linters.bzl",
-])

@@ -1,0 +1,108 @@
+# *******************************************************************************
+# Copyright (c) 2026 Contributors to the Eclipse Foundation
+#
+# See the NOTICE file(s) distributed with this work for additional
+# information regarding copyright ownership.
+#
+# This program and the accompanying materials are made available under the
+# terms of the Apache License Version 2.0 which is available at
+# https://www.apache.org/licenses/LICENSE-2.0
+#
+# SPDX-License-Identifier: Apache-2.0
+# *******************************************************************************
+
+[-optional]
+
+[image=0x5000000]
+[virtual=x86_64,multiboot] boot = {
+    startup-x86 -v -D8250..115200 -zz
+    PATH=/proc/boot:/usr/bin:/usr/sbin
+    LD_LIBRARY_PATH=/proc/boot:/usr/lib
+    [+keeplinked] procnto-smp-instr
+}
+
+[+script] startup-script = {
+    procmgr_symlink /dev/shmem /tmp
+
+    display_msg Welcome to QNX OS 8.0 on x86_64 for S-CORE time_slave tests!
+
+    SYSNAME=nto
+    TERM=qansi
+
+    devc-ser8250 &
+    waitfor /dev/ser1
+    reopen /dev/ser1
+
+    /proc/boot/startup.sh
+
+    [+session] /bin/sh &
+}
+
+[uid=0 gid=0 perms=0700] startup.sh = {
+    echo "---> Starting slogger2"
+    slogger2 -s 4096
+    waitfor /dev/slog
+
+    echo "---> Starting PCI Services"
+    pci-server --config=/proc/boot/pci_server.cfg
+    waitfor /dev/pci
+
+    echo "---> Starting Pipe"
+    pipe
+    waitfor /dev/pipe
+
+    echo "---> Starting Random"
+    random
+    waitfor /dev/random
+
+    echo "---> Starting fsevmgr"
+    fsevmgr
+    waitfor /dev/fsnotify
+
+    echo "---> Starting devb-ram"
+    devb-ram ram capacity=1 blk ramdisk=10m,cache=512k,vnode=256 2>/dev/null
+    waitfor /dev/ram0
+
+    echo "---> mounting ram disk"
+    mkqnx6fs -q /dev/ram0
+    waitfor /dev/ram0
+    mount -t qnx6 /dev/ram0 /tmp_ram
+
+    echo "---> Starting mqueue"
+    mqueue
+    waitfor /dev/mqueue
+
+    echo "---> Starting devc-pty"
+    devc-pty -n 32
+
+    echo "---> Starting Networking"
+    io-sock -m phy -m pci -d vtnet_pci
+    waitfor /dev/socket
+
+    echo "---> Configuring network interface"
+    ifconfig lo0 127.0.0.1 up
+    if_up -p vtnet0
+    ifconfig vtnet0 10.0.2.15 netmask 255.255.255.0
+    route add default 10.0.2.2
+    sysctl -w net.inet.icmp.bmcastecho=1
+
+    echo "---> Setting hostname"
+    hostname qnx-score-time
+
+    echo "---> Generating SSH host key on RAM disk"
+    mkdir -p /tmp_ram/ssh
+    ssh-keygen -t rsa -b 2048 -f /tmp_ram/ssh/ssh_host_rsa_key -N '' -q
+
+    echo "---> Starting sshd"
+    /proc/boot/sshd -E /tmp/sshd.log -f /var/ssh/sshd_config &
+    sleep 3
+    echo "SSH_READY"
+}
+
+#############################################
+### TimeSlave deployment directories ###
+#############################################
+[dperms=755 type=dir] /opt
+[dperms=755 type=dir] /opt/time_slave
+[dperms=755 type=dir] /opt/time_slave/bin
+[dperms=755 type=dir] /opt/time_slave/etc
