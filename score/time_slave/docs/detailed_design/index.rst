@@ -118,8 +118,8 @@ The data and control flow between units is presented in the following diagram:
 
 On this view you could see several "workers" scopes:
 
-1. RxThread scope — receive raw gPTP Ethernet frames, decode PTP messages, correlate Sync/FollowUp pairs
-2. PdelayThread scope — transmit PDelayReq frames, compute peer delay via IEEE 802.1AS formula
+1. RxThread scope — receive raw gPTP Ethernet frames, decode PTP messages, correlate Sync/FollowUp and handle Pdelay messages
+2. PdelayThread scope — periodically transmit PDelayReq frames
 3. Main thread scope — periodically publish aggregated snapshot to shared memory
 
 See ``gptp_engine.h`` for detailed threading model, control flow responsibilities, and concurrency aspects.
@@ -131,22 +131,23 @@ Each control flow has dedicated thread and runs independently.
 
 - **RxThread scope**
 
-  1. receive raw gPTP Ethernet frames with hardware timestamps from NIC via raw sockets
-  2. decode and parse PTP messages (Sync, FollowUp, PdelayResp, PdelayRespFollowUp)
-  3. correlate Sync/FollowUp pairs and compute clock offset and neighborRateRatio
-  4. update shared snapshot under mutex protection
+  #. receive raw gPTP Ethernet frames with hardware timestamps from NIC via raw sockets
+  #. decode and parse PTP messages (Sync, FollowUp, PdelayResp, PdelayRespFollowUp, PdelayReq)
+  #. depending on message type:
+    #. correlate Sync/FollowUp pairs and compute clock offset and neighborRateRatio. Update shared snapshot under mutex protection
+    #. correlate PdelayResp/PdelayRespFollowUp pairs with sent PdelayReq using the PeerDelayMeasurer unit and compute the propagation delay as defined in the IEEE 802.1AS standard
+    #. react on incoming PdelayReq by sending PdelayResp and PdelayRespFollowUp
 
 - **PdelayThread scope**
 
-  1. periodically transmit PDelayReq frames and capture hardware transmit timestamps
-  2. coordinate with RxThread to receive PDelayResp and PDelayRespFollowUp
-  3. compute peer delay using IEEE 802.1AS formula: ``path_delay = ((t2 - t1) + (t4 - t3c)) / 2``
+  #. delay sending the first PdelayReq by the configured pdelay_warmup timespan
+  #. periodically trigger the PeerDelayMeasurer unit to send PdelayReq frames and capture hardware transmit timestamps
 
 - **Main thread (periodic publish) scope**
 
-  1. call ``GptpEngine::FinalizeSnapshot()`` to check timeout and commit pending snapshot
-  2. call ``GptpEngine::ReadPTPSnapshot(data)`` to copy latest ``GptpIpcData`` to local variable
-  3. publish snapshot via ``GptpIpcPublisher::Publish(data)``
+  #. call ``GptpEngine::FinalizeSnapshot()`` to check timeout and commit pending snapshot
+  #. call ``GptpEngine::ReadPTPSnapshot(data)`` to copy latest ``GptpIpcData`` to local variable
+  #. publish snapshot via ``GptpIpcPublisher::Publish(data)``
 
 Data Types or Events
 ^^^^^^^^^^^^^^^^^^^^
@@ -160,16 +161,6 @@ Main data exchanged between units:
 
 Units Within Time Slave
 -----------------------
-
-The following units comprise TimeSlave's internal implementation:
-
-1. **TimeSlave Application** -- process entry point; orchestrates GptpEngine lifecycle and periodic shared-memory publish loop
-2. **GptpEngine** -- core gPTP engine with RxThread/PdelayThread and snapshot API
-3. **FrameCodec** -- raw Ethernet frame encode/decode for gPTP
-4. **MessageParser** -- IEEE 1588-v2 payload parsing
-5. **SyncStateMachine** -- Sync/FollowUp correlation, clock offset, neighbor rate ratio, time-jump detection
-6. **PeerDelayMeasurer** -- IEEE 802.1AS peer-delay measurement
-7. **PhcAdjuster** -- PHC step/slew synchronization backend
 
 GptpEngine
 ~~~~~~~~~~
