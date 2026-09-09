@@ -42,7 +42,7 @@ namespace details
 struct GptpEngineOptions
 {
     std::string iface_name = "emac0";                       ///< Network interface for gPTP
-    int pdelay_interval_ms = 1000;                          ///< Period between Pdelay_Req transmissions (ms)
+    int pdelay_req_interval_ms = 1000;                      ///< Period between Pdelay_Req transmissions (ms)
     int pdelay_warmup_ms = 2000;                            ///< Delay before first Pdelay_Req (ms)
     int sync_timeout_ms = 3300;                             ///< Declare timeout after this many ms without Sync
     std::int64_t jump_future_threshold_ns = 500'000'000LL;  ///< 500 ms
