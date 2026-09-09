@@ -252,7 +252,7 @@ Platform Abstraction
    :version: 1
    :satisfied_by: comp__time_slave
 
-   The time_slave component shall support Linux and QNX 8.0 SDP platforms for Ethernet frame transmission/reception with hardware timestamping and PTP hardware clock control.
+   The time_slave component shall support POSIX and QNX 8.0 SDP platforms for Ethernet frame transmission/reception with hardware timestamping and PTP hardware clock control.
 
 Error Handling
 ^^^^^^^^^^^^^^
