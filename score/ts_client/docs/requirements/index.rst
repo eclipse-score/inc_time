@@ -36,19 +36,19 @@ Shared Memory Management
    :reqtype: Functional
    :security: NO
    :safety: ASIL_B
-   :derived_from: feat_req__time__vehicle_time_sync[version==1]
+   :derived_from: feat_req__time__vehicle_time_sync[version==1], feat_req__time__vehicle_time_ctrl_flow[version==1]
    :status: valid
    :version: 1
    :satisfied_by: comp__ts_client
 
-   The ts_client component shall provide operations to create, open, and close shared memory channels for gPTP data exchange between time daemon and time-aware applications.
+   The ts_client component shall provide operations to create, open, and close shared memory channels for gPTP data exchange between time_slave and time_daemon.
 
 .. comp_req:: Shared Memory Region Validation
    :id: comp_req__ts_client__shm_validation
    :reqtype: Functional
    :security: NO
    :safety: ASIL_B
-   :derived_from: feat_req__time__vehicle_time_sync[version==1]
+   :derived_from: feat_req__time__vehicle_time_sync[version==1], feat_req__time__vehicle_time_acc_qual_api[version==1], feat_req__time__vehicle_time_time_pt_qual[version==1]
    :status: valid
    :version: 1
    :satisfied_by: comp__ts_client
@@ -84,12 +84,12 @@ Shared Memory Management
    :reqtype: Functional
    :security: NO
    :safety: ASIL_B
-   :derived_from: feat_req__time__vehicle_time_sync[version==1]
+   :derived_from: feat_req__time__vehicle_time_sync[version==1], feat_req__time__vehicle_time_acc_qual_api[version==1], feat_req__time__vehicle_time_time_pt_qual[version==1]
    :status: valid
    :version: 1
    :satisfied_by: comp__ts_client
 
-   The ts_client Receiver shall indicate whether received data is valid or corrupted.
+   The ts_client Receiver shall indicate whether the shared memory channel is obviously corrupted.
 
 Data Synchronization
 ^^^^^^^^^^^^^^^^^^^^
@@ -99,12 +99,12 @@ Data Synchronization
    :reqtype: Functional
    :security: NO
    :safety: ASIL_B
-   :derived_from: feat_req__time__vehicle_time_sync[version==1]
+   :derived_from: feat_req__time__vehicle_time_sync[version==1], feat_req__time__vehicle_time_ctrl_flow[version==1]
    :status: valid
    :version: 1
    :satisfied_by: comp__ts_client
 
-   The ts_client component shall implement lock-free synchronization between writer and readers to prevent blocking and ensure readers can detect concurrent writes.
+   The ts_client component shall implement non-blocking synchronization between writer and readers and ensure readers can detect concurrent writes.
 
 Data Exchange Interfaces
 ^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -113,19 +113,19 @@ Data Exchange Interfaces
    :id: comp_req__ts_client__sync_status_data
    :reqtype: Interface
    :security: NO
-   :safety: ASIL_B
+   :safety: QM
    :derived_from: feat_req__time__vehicle_time_sync[version==1]
    :status: valid
    :version: 1
    :satisfied_by: comp__ts_client
 
-   The ts_client component shall exchange gPTP synchronization status information containing synchronized state, timeout condition, time discontinuity detection (future and past), and correctness indication.
+   The ts_client component shall exchange gPTP synchronization status information containing synchronized state and timeout condition.
 
 .. comp_req:: Sync/FollowUp Message Metadata Exchange
    :id: comp_req__ts_client__sync_fup_data
    :reqtype: Interface
    :security: NO
-   :safety: ASIL_B
+   :safety: QM
    :derived_from: feat_req__time__vehicle_time_sync[version==1]
    :status: valid
    :version: 1
@@ -137,7 +137,7 @@ Data Exchange Interfaces
    :id: comp_req__ts_client__pdelay_data
    :reqtype: Interface
    :security: NO
-   :safety: ASIL_B
+   :safety: QM
    :derived_from: feat_req__time__vehicle_time_sync[version==1]
    :status: valid
    :version: 1
@@ -149,7 +149,7 @@ Data Exchange Interfaces
    :id: comp_req__ts_client__time_correlation_data
    :reqtype: Interface
    :security: NO
-   :safety: ASIL_B
+   :safety: QM
    :derived_from: feat_req__time__vehicle_time_sync[version==1]
    :status: valid
    :version: 1
@@ -160,29 +160,18 @@ Data Exchange Interfaces
 Platform Abstraction
 ^^^^^^^^^^^^^^^^^^^^
 
-.. comp_req:: Linux Platform Support
+.. comp_req:: Platform Support
    :id: comp_req__ts_client__platform_linux
    :reqtype: Functional
    :security: NO
-   :safety: ASIL_B
+   :safety: QM
    :derived_from: feat_req__time__vehicle_time_sync[version==1]
    :status: valid
    :version: 1
    :satisfied_by: comp__ts_client
 
-   The ts_client component shall support Linux platforms for shared memory operations and inter-process communication.
+   The ts_client component shall support POSIX and QNX 8.0 SDP platforms for shared memory operations and inter-process communication.
 
-.. comp_req:: QNX Platform Support
-   :id: comp_req__ts_client__platform_qnx
-   :reqtype: Functional
-   :security: NO
-   :safety: ASIL_B
-   :derived_from: feat_req__time__vehicle_time_sync[version==1]
-   :status: valid
-   :version: 1
-   :satisfied_by: comp__ts_client
-
-   The ts_client component shall support QNX 8.0 SDP platforms for shared memory operations and inter-process communication.
 
 Error Handling
 ^^^^^^^^^^^^^^
@@ -191,7 +180,7 @@ Error Handling
    :id: comp_req__ts_client__error_reporting
    :reqtype: Functional
    :security: NO
-   :safety: ASIL_B
+   :safety: QM
    :derived_from: feat_req__time__vehicle_time_sync_log[version==1]
    :status: valid
    :version: 1
@@ -235,7 +224,7 @@ Assumption of Use Requirements
    :status: valid
    :version: 1
 
-   The user shall configure shared memory permissions to allow publisher write access and reader read access. Incorrect permissions will cause channel creation or opening failures.
+   The user shall configure system permissions to allow publisher write access and readers read access to shared memory segments. Incorrect permissions will cause channel creation or opening failures.
 
 .. needextend:: "c.this_doc()"
    :+tags: ts_client

@@ -21,7 +21,7 @@ Time Sync Client
    :id: doc__ts_client
    :status: draft
    :version: 1
-   :safety: QM
+   :safety: ASIL_B
    :security: NO
    :realizes: wp__cmpt_request
    :tags: ts_client
@@ -37,7 +37,7 @@ Time Sync Client
 Abstract
 ========
 
-This component provides IPC mechanisms for time synchronization data exchange between time daemons and client applications within an ECU.
+This component encapsulates the IPC mechanisms for time synchronization data exchange between the components time_slave and time_daemon.
 
 Specification
 =============
