@@ -1,0 +1,16 @@
+{
+    "iface_name": "vtnet0",
+    "domain_number": 0,
+    "pdelay_req_interval_ms": 1000,
+    "pdelay_warmup_ms": 2000,
+    "sync_timeout_ms": 3300,
+    "jump_future_threshold_ns": 500000000,
+    "shm_path": "/gptp_shmem",
+    "phc": {
+        "enabled": false
+    },
+    "qnx": {
+        "bpf_device_prefix": "/dev/bpf",
+        "see_sent": true
+    }
+}

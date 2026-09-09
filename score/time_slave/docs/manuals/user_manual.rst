@@ -62,3 +62,11 @@ Network Requirements
 *   The network interface used for PTP communication **must** be provided via the ``-i, --interface <name>`` command-line argument.
 *   The ECU must have network connectivity to the PTP Grandmaster clock on this interface.
 *   Network hardware must support PHC (PTP Hardware Clock).
+
+Platform-Specific Setup
+=======================
+
+.. toctree::
+   :maxdepth: 1
+
+   qnx_setup
