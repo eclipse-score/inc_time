@@ -262,3 +262,8 @@ http_archive(
     strip_prefix = "json-schema-validator-2.1.0",
     urls = ["https://github.com/pboettch/json-schema-validator/archive/refs/tags/2.1.0.tar.gz"],
 )
+
+bazel_dep(
+    name = "score_devcontainer",
+    version = "1.8.0",
+)
