@@ -62,12 +62,6 @@ VehicleClockBackendImpl::VehicleClockBackendImpl(std::shared_ptr<score::td::SvtR
       sync_data_slot_{},
       pdelay_slot_{},
       status_slot_{},
-      baselined_sync_generation_{0U},
-      last_sync_data_{},
-      baselined_pdelay_generation_{0U},
-      last_pdelay_data_{},
-      delivered_status_generation_{0U},
-      last_delivered_status_flags_{},
       worker_mutex_{},
       worker_wakeup_{},
       worker_{}
@@ -249,70 +243,15 @@ void VehicleClockBackendImpl::PollAndDispatch() noexcept
         return;
     }
 
-    DispatchTimeSlaveSyncData(frame.value());
-    DispatchPDelayMeasurementData(frame.value());
-    DispatchStatus(frame.value());
-}
+    const auto& sync_data = frame.value().sync_fup_data;
+    score::cpp::ignore = sync_data_slot_.InvokeIfChanged(sync_data, ConvertSyncData(sync_data));
 
-void VehicleClockBackendImpl::DispatchTimeSlaveSyncData(const score::td::svt::TimeBaseSnapshot& frame) noexcept
-{
-    const auto generation = sync_data_slot_.Generation();
-    if (generation != baselined_sync_generation_)
-    {
-        // Fresh registration: the frame currently in shared memory is the baseline, not a new frame.
-        baselined_sync_generation_ = generation;
-        last_sync_data_ = frame.sync_fup_data;
-        return;
-    }
+    const auto& pdelay_data = frame.value().pdelay_data;
+    score::cpp::ignore = pdelay_slot_.InvokeIfChanged(pdelay_data, ConvertPDelayData(pdelay_data));
 
-    if (last_sync_data_.has_value() && (last_sync_data_.value() == frame.sync_fup_data))
-    {
-        return;
-    }
-
-    last_sync_data_ = frame.sync_fup_data;
-    score::cpp::ignore = sync_data_slot_.Invoke(ConvertSyncData(frame.sync_fup_data));
-}
-
-void VehicleClockBackendImpl::DispatchPDelayMeasurementData(const score::td::svt::TimeBaseSnapshot& frame) noexcept
-{
-    const auto generation = pdelay_slot_.Generation();
-    if (generation != baselined_pdelay_generation_)
-    {
-        // Fresh registration: the frame currently in shared memory is the baseline, not a new frame.
-        baselined_pdelay_generation_ = generation;
-        last_pdelay_data_ = frame.pdelay_data;
-        return;
-    }
-
-    if (last_pdelay_data_.has_value() && (last_pdelay_data_.value() == frame.pdelay_data))
-    {
-        return;
-    }
-
-    last_pdelay_data_ = frame.pdelay_data;
-    score::cpp::ignore = pdelay_slot_.Invoke(ConvertPDelayData(frame.pdelay_data));
-}
-
-void VehicleClockBackendImpl::DispatchStatus(const score::td::svt::TimeBaseSnapshot& frame) noexcept
-{
-    const auto flags = ConvertPtpStatus(frame.status);
-
-    const bool first_after_registration = (status_slot_.Generation() != delivered_status_generation_);
-    const bool flags_changed =
-        (!last_delivered_status_flags_.has_value()) || (!(last_delivered_status_flags_.value() == flags));
-    if (!(first_after_registration || flags_changed))
-    {
-        return;
-    }
-
-    const VehicleTimeStatus status{flags, frame.rate_deviation};
-    const auto invoked_generation = status_slot_.Invoke(status);
-    if (invoked_generation.has_value())
-    {
-        delivered_status_generation_ = invoked_generation.value();
-        last_delivered_status_flags_ = flags;
-    }
+    const auto status_flags = ConvertPtpStatus(frame.value().status);
+    score::cpp::ignore =
+        status_slot_.InvokeIfChanged(status_flags, VehicleTimeStatus{status_flags, frame.value().rate_deviation});
 }
 
 ClockStatus<VehicleTime::StatusFlag> VehicleClockBackendImpl::ConvertPtpStatus(

@@ -34,7 +34,7 @@ namespace
 {
 
 using TestCallback = score::cpp::callback<void(const int&), 64U>;
-using Slot = CallbackSlot<TestCallback>;
+using Slot = CallbackSlot<TestCallback, int>;
 
 /// @brief One-shot gate that lets one thread block until another thread opens it.
 class Gate
@@ -69,14 +69,14 @@ class Gate
     bool open_{false};
 };
 
-TEST(CallbackSlotTest, InvokeReturnsNulloptWhenNoCallbackIsSet)
+TEST(CallbackSlotTest, InvokeIfChangedReturnsFalseWhenNoCallbackIsSet)
 {
     Slot slot;
     EXPECT_FALSE(slot.IsSet());
-    EXPECT_FALSE(slot.Invoke(1).has_value());
+    EXPECT_FALSE(slot.InvokeIfChanged(1, 1));
 }
 
-TEST(CallbackSlotTest, InvokeCallsStoredCallbackWithArgument)
+TEST(CallbackSlotTest, InvokeIfChangedCallsStoredCallbackWithArgumentOnEveryNewKey)
 {
     Slot slot;
     std::vector<int> received;
@@ -85,34 +85,59 @@ TEST(CallbackSlotTest, InvokeCallsStoredCallbackWithArgument)
     });
 
     EXPECT_TRUE(slot.IsSet());
-    EXPECT_TRUE(slot.Invoke(7).has_value());
-    EXPECT_TRUE(slot.Invoke(8).has_value());
-    EXPECT_EQ(received, (std::vector<int>{7, 8}));
+    EXPECT_TRUE(slot.InvokeIfChanged(7, 70));
+    EXPECT_TRUE(slot.InvokeIfChanged(8, 80));
+    EXPECT_EQ(received, (std::vector<int>{70, 80}));
 }
 
-TEST(CallbackSlotTest, GenerationIncrementsOnEverySetAndIsReportedByInvoke)
+TEST(CallbackSlotTest, InvokeIfChangedSkipsRepeatedKey)
 {
     Slot slot;
-    EXPECT_EQ(slot.Generation(), 0U);
+    int invocations{0};
+    slot.Set([&invocations](const int&) {
+        ++invocations;
+    });
 
-    slot.Set([](const int&) {});
-    EXPECT_EQ(slot.Generation(), 1U);
-    EXPECT_EQ(slot.Invoke(0).value(), 1U);
-
-    slot.Set([](const int&) {});
-    EXPECT_EQ(slot.Generation(), 2U);
-    EXPECT_EQ(slot.Invoke(0).value(), 2U);
+    EXPECT_TRUE(slot.InvokeIfChanged(7, 7));
+    EXPECT_FALSE(slot.InvokeIfChanged(7, 7));
+    EXPECT_FALSE(slot.InvokeIfChanged(7, 8));  // argument differs but key does not
+    EXPECT_TRUE(slot.InvokeIfChanged(9, 9));
+    EXPECT_EQ(invocations, 2);
 }
 
-TEST(CallbackSlotTest, UnsetRemovesCallbackWithoutChangingGeneration)
+TEST(CallbackSlotTest, SetForgetsLastKeySoNewCallbackIsInvokedWithUnchangedKey)
 {
     Slot slot;
     slot.Set([](const int&) {});
+    EXPECT_TRUE(slot.InvokeIfChanged(7, 7));
+    EXPECT_FALSE(slot.InvokeIfChanged(7, 7));
+
+    int replacement_invocations{0};
+    slot.Set([&replacement_invocations](const int&) {
+        ++replacement_invocations;
+    });
+    EXPECT_TRUE(slot.InvokeIfChanged(7, 7));
+    EXPECT_EQ(replacement_invocations, 1);
+}
+
+TEST(CallbackSlotTest, UnsetRemovesCallbackAndForgetsLastKey)
+{
+    Slot slot;
+    int invocations{0};
+    slot.Set([&invocations](const int&) {
+        ++invocations;
+    });
+    EXPECT_TRUE(slot.InvokeIfChanged(7, 7));
     slot.Unset();
 
     EXPECT_FALSE(slot.IsSet());
-    EXPECT_EQ(slot.Generation(), 1U);
-    EXPECT_FALSE(slot.Invoke(0).has_value());
+    EXPECT_FALSE(slot.InvokeIfChanged(7, 7));
+
+    slot.Set([&invocations](const int&) {
+        ++invocations;
+    });
+    EXPECT_TRUE(slot.InvokeIfChanged(7, 7));
+    EXPECT_EQ(invocations, 2);
 }
 
 TEST(CallbackSlotTest, SettingEmptyCallbackBehavesLikeUnset)
@@ -122,8 +147,7 @@ TEST(CallbackSlotTest, SettingEmptyCallbackBehavesLikeUnset)
     slot.Set(TestCallback{});
 
     EXPECT_FALSE(slot.IsSet());
-    EXPECT_EQ(slot.Generation(), 1U);
-    EXPECT_FALSE(slot.Invoke(0).has_value());
+    EXPECT_FALSE(slot.InvokeIfChanged(0, 0));
 }
 
 TEST(CallbackSlotTest, UnsetFromWithinCallbackDoesNotDeadlockAndTakesEffectAfterwards)
@@ -135,9 +159,9 @@ TEST(CallbackSlotTest, UnsetFromWithinCallbackDoesNotDeadlockAndTakesEffectAfter
         slot.Unset();
     });
 
-    EXPECT_TRUE(slot.Invoke(0).has_value());
+    EXPECT_TRUE(slot.InvokeIfChanged(0, 0));
     EXPECT_FALSE(slot.IsSet());
-    EXPECT_FALSE(slot.Invoke(0).has_value());
+    EXPECT_FALSE(slot.InvokeIfChanged(0, 0));
     EXPECT_EQ(invocations, 1);
 }
 
@@ -152,8 +176,8 @@ TEST(CallbackSlotTest, SetFromWithinCallbackReplacesCallbackForNextInvocation)
         });
     });
 
-    EXPECT_EQ(slot.Invoke(0).value(), 1U);
-    EXPECT_EQ(slot.Invoke(0).value(), 2U);
+    EXPECT_TRUE(slot.InvokeIfChanged(0, 0));
+    EXPECT_TRUE(slot.InvokeIfChanged(0, 0));
     EXPECT_EQ(trace, (std::vector<int>{1, 2}));
 }
 
@@ -168,7 +192,7 @@ TEST(CallbackSlotTest, UnsetFromAnotherThreadBlocksUntilInFlightInvocationReturn
     });
 
     std::thread invoker{[&slot]() {
-        std::ignore = slot.Invoke(0);
+        std::ignore = slot.InvokeIfChanged(0, 0);
     }};
     callback_entered.Wait();
 
@@ -194,7 +218,7 @@ TEST(CallbackSlotTest, SetFromAnotherThreadBlocksUntilInFlightInvocationReturns)
     });
 
     std::thread invoker{[&slot]() {
-        std::ignore = slot.Invoke(0);
+        std::ignore = slot.InvokeIfChanged(0, 0);
     }};
     callback_entered.Wait();
 
@@ -210,7 +234,7 @@ TEST(CallbackSlotTest, SetFromAnotherThreadBlocksUntilInFlightInvocationReturns)
     EXPECT_EQ(set_done.wait_for(std::chrono::seconds{5}), std::future_status::ready);
     invoker.join();
 
-    EXPECT_EQ(slot.Invoke(0).value(), 2U);
+    EXPECT_TRUE(slot.InvokeIfChanged(0, 0));
     EXPECT_EQ(replacement_invocations, 1);
 }
 

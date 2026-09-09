@@ -60,8 +60,9 @@ class VehicleClockBackend
 
     /// \brief Installs the callback invoked when new time-sync data arrives.
     ///
-    /// Fires once for every new Sync/Follow-Up frame received from the TimeDaemon after
-    /// registration.  Invoked on the backend's dedicated worker thread.
+    /// Fires for the first Sync/Follow-Up frame received from the TimeDaemon after registration
+    /// and afterwards for every frame whose content differs from the previously delivered one.
+    /// Invoked on the backend's dedicated worker thread.
     ///
     /// Replacing an installed callback is safe while an invocation is in flight: the call
     /// returns only once the previous callback is no longer running (unless made from
@@ -77,9 +78,10 @@ class VehicleClockBackend
 
     /// \brief Installs the callback invoked after a finished pDelay measurement.
     ///
-    /// Fires once for every new pDelay measurement result received from the TimeDaemon after
-    /// registration.  Invoked on the backend's dedicated worker thread.  Same replacement
-    /// guarantees as \c SetTimeSlaveSyncDataReceivedCallback().
+    /// Fires for the first pDelay measurement result received from the TimeDaemon after
+    /// registration and afterwards for every result that differs from the previously delivered
+    /// one.  Invoked on the backend's dedicated worker thread.  Same replacement guarantees as
+    /// \c SetTimeSlaveSyncDataReceivedCallback().
     virtual void SetPDelayMeasurementFinishedCallback(
         VehicleTime::PDelayMeasurementFinishedCallback&& callback) noexcept = 0;
 

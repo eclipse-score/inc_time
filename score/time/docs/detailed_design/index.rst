@@ -437,8 +437,9 @@ diagnostics and PTP data sanity checks:
 Delivery is performed by a dedicated worker thread owned by the ``VehicleTime`` backend.
 The TimeDaemon publishes into a shared-memory segment without a notification facility, so
 the worker polls that segment at a fixed interval (50 ms) while at least one callback is
-registered and dispatches every frame whose sync or pDelay content changed.  The frame that
-is already present at registration time forms the baseline and is not delivered.
+registered.  A newly registered callback receives the first frame polled after its
+registration; afterwards it is invoked only for frames whose sync or pDelay content differs
+from the previously delivered one.
 
 .. code-block:: cpp
 

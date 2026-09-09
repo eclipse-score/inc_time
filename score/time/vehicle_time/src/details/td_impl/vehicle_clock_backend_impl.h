@@ -29,10 +29,8 @@
 
 #include <atomic>
 #include <chrono>
-#include <cstdint>
 #include <memory>
 #include <mutex>
-#include <optional>
 
 namespace score
 {
@@ -56,13 +54,13 @@ namespace detail
 /// backend owns a dedicated worker thread that polls the receiver every @p poll_interval
 /// while at least one callback is registered (no polling happens without subscribers).
 /// The worker is started by the first successful @c Init() and joined in the destructor.
-/// On every frame read from the receiver it dispatches, on the worker thread:
-///  - @c TimeSlaveSyncData — when the sync/follow-up part of the frame differs from the last one seen;
-///  - @c PDelayMeasurementData — when the pDelay part of the frame differs from the last one seen;
-///  - @c VehicleTimeStatus — unconditionally on the first frame after (re-)registration, afterwards
-///    only when the status flags differ from the last delivered ones (rate deviation excluded).
-/// The frame present when a data callback is registered forms the baseline and is not delivered;
-/// only frames that change afterwards count as "new".
+/// Every frame read from the receiver is offered part by part to the three @c CallbackSlot s, which
+/// dispatch on the worker thread when the part differs from what they last delivered:
+///  - @c TimeSlaveSyncData — the sync/follow-up part;
+///  - @c PDelayMeasurementData — the pDelay part;
+///  - @c VehicleTimeStatus — keyed on the status flags (rate deviation excluded from the comparison).
+/// A newly registered callback (first registration, re-registration, or replacement) always receives
+/// the first frame polled after its registration, and afterwards only changes.
 ///
 /// Set/Unset are safe to call concurrently with an in-flight invocation (see @c CallbackSlot).
 ///
@@ -133,12 +131,8 @@ class VehicleClockBackendImpl final : public VehicleClockBackend
     /// @brief Returns @c true if at least one callback is currently registered.
     bool IsAnyCallbackSet() const noexcept;
 
-    /// @brief Reads one frame from the receiver and dispatches all due callbacks.
+    /// @brief Reads one frame from the receiver and offers each part to its slot.
     void PollAndDispatch() noexcept;
-
-    void DispatchTimeSlaveSyncData(const score::td::svt::TimeBaseSnapshot& frame) noexcept;
-    void DispatchPDelayMeasurementData(const score::td::svt::TimeBaseSnapshot& frame) noexcept;
-    void DispatchStatus(const score::td::svt::TimeBaseSnapshot& frame) noexcept;
 
     std::atomic_bool is_ready_;
     std::mutex init_mutex_;
@@ -147,17 +141,9 @@ class VehicleClockBackendImpl final : public VehicleClockBackend
 
     const std::chrono::milliseconds poll_interval_;
 
-    CallbackSlot<VehicleTime::TimeSlaveSyncDataReceivedCallback> sync_data_slot_;
-    CallbackSlot<VehicleTime::PDelayMeasurementFinishedCallback> pdelay_slot_;
-    CallbackSlot<VehicleTime::StatusChangedCallback> status_slot_;
-
-    // Delivery bookkeeping — touched by the worker thread only, hence unsynchronised.
-    std::uint64_t baselined_sync_generation_;
-    std::optional<score::td::svt::SyncFupSnapshot> last_sync_data_;
-    std::uint64_t baselined_pdelay_generation_;
-    std::optional<score::td::svt::PDelayDataSnapshot> last_pdelay_data_;
-    std::uint64_t delivered_status_generation_;
-    std::optional<ClockStatus<VehicleTime::StatusFlag>> last_delivered_status_flags_;
+    CallbackSlot<VehicleTime::TimeSlaveSyncDataReceivedCallback, score::td::svt::SyncFupSnapshot> sync_data_slot_;
+    CallbackSlot<VehicleTime::PDelayMeasurementFinishedCallback, score::td::svt::PDelayDataSnapshot> pdelay_slot_;
+    CallbackSlot<VehicleTime::StatusChangedCallback, ClockStatus<VehicleTime::StatusFlag>> status_slot_;
 
     std::mutex worker_mutex_;
     score::concurrency::InterruptibleConditionalVariable worker_wakeup_;

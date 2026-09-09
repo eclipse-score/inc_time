@@ -566,7 +566,7 @@ TEST_F(VehicleClockBackendImplTest, StatusCallbackIgnoresRateDeviationChanges)
     EXPECT_DOUBLE_EQ(recorder.Last().RateDeviation(), 1.0);
 }
 
-TEST_F(VehicleClockBackendImplTest, StatusCallbackFiresAgainUnconditionallyAfterReRegistration)
+TEST_F(VehicleClockBackendImplTest, StatusCallbackReRegisteredReceivesUnchangedStatusAgain)
 {
     InitBackend();
     ServeFramesFromSource();
@@ -588,9 +588,13 @@ TEST_F(VehicleClockBackendImplTest, StatusCallbackFiresAgainUnconditionallyAfter
     ASSERT_TRUE(second_recorder.WaitForCount(1U));
     EXPECT_TRUE(second_recorder.Last().IsFlagActive(VehicleTime::StatusFlag::kSynchronized));
     EXPECT_EQ(first_recorder.Count(), 1U);
+
+    // Afterwards only changes are delivered.
+    ASSERT_TRUE(frame_source_.WaitForAdditionalPolls(5U));
+    EXPECT_EQ(second_recorder.Count(), 1U);
 }
 
-TEST_F(VehicleClockBackendImplTest, StatusCallbackReplacedWithoutUnsetFiresUnconditionally)
+TEST_F(VehicleClockBackendImplTest, StatusCallbackReplacedWithoutUnsetReceivesUnchangedStatusAgain)
 {
     InitBackend();
     ServeFramesFromSource();
@@ -608,7 +612,31 @@ TEST_F(VehicleClockBackendImplTest, StatusCallbackReplacedWithoutUnsetFiresUncon
     });
 
     ASSERT_TRUE(second_recorder.WaitForCount(1U));
+    EXPECT_TRUE(second_recorder.Last().IsFlagActive(VehicleTime::StatusFlag::kSynchronized));
     EXPECT_EQ(first_recorder.Count(), 1U);
+}
+
+TEST_F(VehicleClockBackendImplTest, StatusCallbackRegisteredWhileWorkerIsActiveReceivesCurrentStatusFirst)
+{
+    InitBackend();
+    ServeFramesFromSource();
+    frame_source_.Set(MakeFrame(kTimeoutStatus));
+
+    // Worker already running and has seen the timeout status through another callback.
+    impl_->SetPDelayMeasurementFinishedCallback([](const PDelayMeasurementData<VehicleTime>&) {});
+    ASSERT_TRUE(frame_source_.WaitForAdditionalPolls(5U));
+
+    Recorder<VehicleTimeStatus> recorder;
+    impl_->SetStatusChangedCallback([&recorder](const VehicleTimeStatus& status) {
+        recorder.Record(status);
+    });
+
+    ASSERT_TRUE(recorder.WaitForCount(1U));
+    EXPECT_TRUE(recorder.Last().IsFlagActive(VehicleTime::StatusFlag::kTimeOut));
+
+    frame_source_.Set(MakeFrame(kSynchronizedStatus));
+    ASSERT_TRUE(recorder.WaitForCount(2U));
+    EXPECT_FALSE(recorder.Last().IsFlagActive(VehicleTime::StatusFlag::kTimeOut));
 }
 
 TEST_F(VehicleClockBackendImplTest, UnsetStatusCallbackStopsDelivery)
@@ -636,7 +664,7 @@ TEST_F(VehicleClockBackendImplTest, UnsetStatusCallbackStopsDelivery)
 // Callback delivery — TimeSlaveSyncData
 // ---------------------------------------------------------------------------
 
-TEST_F(VehicleClockBackendImplTest, SyncDataCallbackTreatsFrameAtRegistrationAsBaseline)
+TEST_F(VehicleClockBackendImplTest, SyncDataCallbackReceivesCurrentFrameOnRegistration)
 {
     InitBackend();
     ServeFramesFromSource();
@@ -649,8 +677,12 @@ TEST_F(VehicleClockBackendImplTest, SyncDataCallbackTreatsFrameAtRegistrationAsB
         recorder.Record(data);
     });
 
+    ASSERT_TRUE(recorder.WaitForCount(1U));
+    EXPECT_EQ(recorder.Last().sequence_id, 1U);
+
+    // Unchanged frame: no further delivery.
     ASSERT_TRUE(frame_source_.WaitForAdditionalPolls(5U));
-    EXPECT_EQ(recorder.Count(), 0U);
+    EXPECT_EQ(recorder.Count(), 1U);
 }
 
 TEST_F(VehicleClockBackendImplTest, SyncDataCallbackFiresOnEachNewFrame)
@@ -665,21 +697,71 @@ TEST_F(VehicleClockBackendImplTest, SyncDataCallbackFiresOnEachNewFrame)
     impl_->SetTimeSlaveSyncDataReceivedCallback([&recorder](const TimeSlaveSyncData<VehicleTime>& data) {
         recorder.Record(data);
     });
-    ASSERT_TRUE(frame_source_.WaitForAdditionalPolls(2U));
+    ASSERT_TRUE(recorder.WaitForCount(1U));
 
     frame.sync_fup_data.sequence_id = 2U;
     frame_source_.Set(frame);
-    ASSERT_TRUE(recorder.WaitForCount(1U));
+    ASSERT_TRUE(recorder.WaitForCount(2U));
     EXPECT_EQ(recorder.Last().sequence_id, 2U);
 
     // Unchanged frame: no further delivery.
     ASSERT_TRUE(frame_source_.WaitForAdditionalPolls(5U));
-    EXPECT_EQ(recorder.Count(), 1U);
+    EXPECT_EQ(recorder.Count(), 2U);
 
     frame.sync_fup_data.sequence_id = 3U;
     frame_source_.Set(frame);
-    ASSERT_TRUE(recorder.WaitForCount(2U));
+    ASSERT_TRUE(recorder.WaitForCount(3U));
     EXPECT_EQ(recorder.Last().sequence_id, 3U);
+}
+
+TEST_F(VehicleClockBackendImplTest, SyncDataCallbackRegisteredWhileWorkerIsActiveReceivesCurrentFrameFirst)
+{
+    InitBackend();
+    ServeFramesFromSource();
+    auto frame = MakeFrame(kSynchronizedStatus);
+    frame.sync_fup_data.sequence_id = 1U;
+    frame_source_.Set(frame);
+
+    // Worker already running and has seen sequence 1 through another callback.
+    impl_->SetStatusChangedCallback([](const VehicleTimeStatus&) {});
+    ASSERT_TRUE(frame_source_.WaitForAdditionalPolls(5U));
+
+    Recorder<TimeSlaveSyncData<VehicleTime>> recorder;
+    impl_->SetTimeSlaveSyncDataReceivedCallback([&recorder](const TimeSlaveSyncData<VehicleTime>& data) {
+        recorder.Record(data);
+    });
+
+    ASSERT_TRUE(recorder.WaitForCount(1U));
+    EXPECT_EQ(recorder.Last().sequence_id, 1U);
+
+    frame.sync_fup_data.sequence_id = 2U;
+    frame_source_.Set(frame);
+    ASSERT_TRUE(recorder.WaitForCount(2U));
+    EXPECT_EQ(recorder.Last().sequence_id, 2U);
+}
+
+TEST_F(VehicleClockBackendImplTest, SyncDataCallbackReplacedWithoutUnsetReceivesCurrentFrameFirst)
+{
+    InitBackend();
+    ServeFramesFromSource();
+    auto frame = MakeFrame(kSynchronizedStatus);
+    frame.sync_fup_data.sequence_id = 1U;
+    frame_source_.Set(frame);
+
+    Recorder<TimeSlaveSyncData<VehicleTime>> first_recorder;
+    impl_->SetTimeSlaveSyncDataReceivedCallback([&first_recorder](const TimeSlaveSyncData<VehicleTime>& data) {
+        first_recorder.Record(data);
+    });
+    ASSERT_TRUE(first_recorder.WaitForCount(1U));
+
+    Recorder<TimeSlaveSyncData<VehicleTime>> second_recorder;
+    impl_->SetTimeSlaveSyncDataReceivedCallback([&second_recorder](const TimeSlaveSyncData<VehicleTime>& data) {
+        second_recorder.Record(data);
+    });
+
+    ASSERT_TRUE(second_recorder.WaitForCount(1U));
+    EXPECT_EQ(second_recorder.Last().sequence_id, 1U);
+    EXPECT_EQ(first_recorder.Count(), 1U);
 }
 
 TEST_F(VehicleClockBackendImplTest, SyncDataCallbackReceivesConvertedFields)
@@ -692,13 +774,13 @@ TEST_F(VehicleClockBackendImplTest, SyncDataCallbackReceivesConvertedFields)
     impl_->SetTimeSlaveSyncDataReceivedCallback([&recorder](const TimeSlaveSyncData<VehicleTime>& data) {
         recorder.Record(data);
     });
-    ASSERT_TRUE(frame_source_.WaitForAdditionalPolls(2U));
+    ASSERT_TRUE(recorder.WaitForCount(1U));
 
     auto frame = MakeFrame(kSynchronizedStatus);
     frame.sync_fup_data = SvtSyncData{101ULL, 202ULL, 303ULL, 404ULL, 0x10000ULL, 55U, 606ULL, 7U, 0xABCDULL};
     frame_source_.Set(frame);
 
-    ASSERT_TRUE(recorder.WaitForCount(1U));
+    ASSERT_TRUE(recorder.WaitForCount(2U));
     const auto data = recorder.Last();
     EXPECT_EQ(data.precise_origin_timestamp.time_since_epoch(), 101ns);
     EXPECT_EQ(data.reference_global_timestamp.time_since_epoch(), 202ns);
@@ -722,7 +804,7 @@ TEST_F(VehicleClockBackendImplTest, UnsetSyncDataCallbackStopsDelivery)
     impl_->SetTimeSlaveSyncDataReceivedCallback([&recorder](const TimeSlaveSyncData<VehicleTime>& data) {
         recorder.Record(data);
     });
-    ASSERT_TRUE(frame_source_.WaitForAdditionalPolls(2U));
+    ASSERT_TRUE(recorder.WaitForCount(1U));
     impl_->UnsetTimeSlaveSyncDataReceivedCallback();
 
     // Keep the worker polling through another registered callback.
@@ -731,7 +813,7 @@ TEST_F(VehicleClockBackendImplTest, UnsetSyncDataCallbackStopsDelivery)
     frame_source_.Set(frame);
 
     ASSERT_TRUE(frame_source_.WaitForAdditionalPolls(5U));
-    EXPECT_EQ(recorder.Count(), 0U);
+    EXPECT_EQ(recorder.Count(), 1U);
 }
 
 // ---------------------------------------------------------------------------
@@ -750,20 +832,21 @@ TEST_F(VehicleClockBackendImplTest, PDelayCallbackFiresOnEachNewFrame)
     impl_->SetPDelayMeasurementFinishedCallback([&recorder](const PDelayMeasurementData<VehicleTime>& data) {
         recorder.Record(data);
     });
-    ASSERT_TRUE(frame_source_.WaitForAdditionalPolls(5U));
-    EXPECT_EQ(recorder.Count(), 0U);
+    ASSERT_TRUE(recorder.WaitForCount(1U));
+    EXPECT_EQ(recorder.Last().sequence_id, 1U);
 
     frame.pdelay_data.sequence_id = 2U;
     frame_source_.Set(frame);
-    ASSERT_TRUE(recorder.WaitForCount(1U));
+    ASSERT_TRUE(recorder.WaitForCount(2U));
     EXPECT_EQ(recorder.Last().sequence_id, 2U);
 
+    // Unchanged frame: no further delivery.
     ASSERT_TRUE(frame_source_.WaitForAdditionalPolls(5U));
-    EXPECT_EQ(recorder.Count(), 1U);
+    EXPECT_EQ(recorder.Count(), 2U);
 
     frame.pdelay_data.sequence_id = 3U;
     frame_source_.Set(frame);
-    ASSERT_TRUE(recorder.WaitForCount(2U));
+    ASSERT_TRUE(recorder.WaitForCount(3U));
     EXPECT_EQ(recorder.Last().sequence_id, 3U);
 }
 
@@ -777,14 +860,14 @@ TEST_F(VehicleClockBackendImplTest, PDelayCallbackReceivesConvertedFields)
     impl_->SetPDelayMeasurementFinishedCallback([&recorder](const PDelayMeasurementData<VehicleTime>& data) {
         recorder.Record(data);
     });
-    ASSERT_TRUE(frame_source_.WaitForAdditionalPolls(2U));
+    ASSERT_TRUE(recorder.WaitForCount(1U));
 
     auto frame = MakeFrame(kSynchronizedStatus);
     frame.pdelay_data =
         SvtPDelayData{11ULL, 22ULL, 33ULL, 44ULL, 55ULL, 66ULL, 77U, 88ULL, 3U, 0x1111ULL, 4U, 0x2222ULL};
     frame_source_.Set(frame);
 
-    ASSERT_TRUE(recorder.WaitForCount(1U));
+    ASSERT_TRUE(recorder.WaitForCount(2U));
     const auto data = recorder.Last();
     EXPECT_EQ(data.request_origin_timestamp.time_since_epoch(), 11ns);
     EXPECT_EQ(data.request_receipt_timestamp.time_since_epoch(), 22ns);
@@ -811,7 +894,7 @@ TEST_F(VehicleClockBackendImplTest, UnsetPDelayCallbackStopsDelivery)
     impl_->SetPDelayMeasurementFinishedCallback([&recorder](const PDelayMeasurementData<VehicleTime>& data) {
         recorder.Record(data);
     });
-    ASSERT_TRUE(frame_source_.WaitForAdditionalPolls(2U));
+    ASSERT_TRUE(recorder.WaitForCount(1U));
     impl_->UnsetPDelayMeasurementFinishedCallback();
 
     // Keep the worker polling through another registered callback.
@@ -820,7 +903,7 @@ TEST_F(VehicleClockBackendImplTest, UnsetPDelayCallbackStopsDelivery)
     frame_source_.Set(frame);
 
     ASSERT_TRUE(frame_source_.WaitForAdditionalPolls(5U));
-    EXPECT_EQ(recorder.Count(), 0U);
+    EXPECT_EQ(recorder.Count(), 1U);
 }
 
 TEST_F(VehicleClockBackendImplTest, AllThreeCallbacksAreDeliveredFromTheSameFrame)
@@ -843,7 +926,8 @@ TEST_F(VehicleClockBackendImplTest, AllThreeCallbacksAreDeliveredFromTheSameFram
         status_recorder.Record(status);
     });
     ASSERT_TRUE(status_recorder.WaitForCount(1U));
-    ASSERT_TRUE(frame_source_.WaitForAdditionalPolls(2U));
+    ASSERT_TRUE(sync_recorder.WaitForCount(1U));
+    ASSERT_TRUE(pdelay_recorder.WaitForCount(1U));
 
     frame.status = kTimeoutStatus;
     frame.sync_fup_data.sequence_id = 5U;
@@ -851,8 +935,8 @@ TEST_F(VehicleClockBackendImplTest, AllThreeCallbacksAreDeliveredFromTheSameFram
     frame_source_.Set(frame);
 
     ASSERT_TRUE(status_recorder.WaitForCount(2U));
-    ASSERT_TRUE(sync_recorder.WaitForCount(1U));
-    ASSERT_TRUE(pdelay_recorder.WaitForCount(1U));
+    ASSERT_TRUE(sync_recorder.WaitForCount(2U));
+    ASSERT_TRUE(pdelay_recorder.WaitForCount(2U));
     EXPECT_TRUE(status_recorder.Last().IsFlagActive(VehicleTime::StatusFlag::kTimeOut));
     EXPECT_EQ(sync_recorder.Last().sequence_id, 5U);
     EXPECT_EQ(pdelay_recorder.Last().sequence_id, 6U);
@@ -899,12 +983,12 @@ TEST_F(VehicleClockBackendImplTest, SubscribingToAnotherEventFromWithinCallbackD
         });
     });
     ASSERT_TRUE(status_recorder.WaitForCount(1U));
-    ASSERT_TRUE(frame_source_.WaitForAdditionalPolls(2U));
+    ASSERT_TRUE(sync_recorder.WaitForCount(1U));
 
     frame.sync_fup_data.sequence_id = 42U;
     frame_source_.Set(frame);
 
-    ASSERT_TRUE(sync_recorder.WaitForCount(1U));
+    ASSERT_TRUE(sync_recorder.WaitForCount(2U));
     EXPECT_EQ(sync_recorder.Last().sequence_id, 42U);
 }
 
