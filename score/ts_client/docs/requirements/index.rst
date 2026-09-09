@@ -161,7 +161,7 @@ Platform Abstraction
 ^^^^^^^^^^^^^^^^^^^^
 
 .. comp_req:: Platform Support
-   :id: comp_req__ts_client__platform_linux
+   :id: comp_req__ts_client__platform_support
    :reqtype: Functional
    :security: NO
    :safety: QM
