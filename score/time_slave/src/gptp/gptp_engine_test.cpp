@@ -240,8 +240,8 @@ GptpEngineOptions FastOptions()
 {
     GptpEngineOptions o;
     o.iface_name = "lo";
-    o.pdelay_warmup_ms = 0;     // no warmup — first Pdelay_Req fires immediately
-    o.pdelay_interval_ms = 10;  // 10 ms cycle
+    o.pdelay_warmup_ms = 0;         // no warmup — first Pdelay_Req fires immediately
+    o.pdelay_req_interval_ms = 10;  // 10 ms cycle
     o.sync_timeout_ms = 3300;
     o.jump_future_threshold_ns = 500'000'000LL;
     return o;
