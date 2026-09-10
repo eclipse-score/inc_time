@@ -15,9 +15,7 @@
 .. _time_daemon:
 
 Time Daemon
-#####################
-
-.. note:: Document header
+###########
 
 .. document:: Time Daemon
    :id: doc__time_daemon
@@ -28,51 +26,53 @@ Time Daemon
    :realizes: wp__cmpt_request
    :tags: time_daemon
 
-.. note::
-   Work in progress: structure, titles, and needs IDs only. Content and req/comp/feat traceability links to follow in later PRs.
-
-.. code-block:: rst
-
-   .. comp:: Time Daemon
-      :id: comp__time_daemon_template
-      :security: YES
-      :safety: ASIL_B
-      :status: invalid
-      :implements: logic_arc_int__feature_name__interface_name1
-      :consists_of: comp__component_name_internal_1, comp__component_name_internal_2, comp__component_name_internal_3
-      :belongs_to: feat__feature_name
-
-.. attention::
-    The above directives must be updated according to your Component.
-
-    - Adjust ``status`` to be ``valid``
-    - Adjust ``safety`` and ``tags`` according to your needs
+.. comp:: Time Daemon
+   :id: comp__time_daemon
+   :security: NO
+   :safety: ASIL_B
+   :status: valid
+   :version: 1
+   :belongs_to: feat__time
 
 Abstract
 ========
 
-[A short (~200 word) description of the component.]
-
+This component implements a time synchronization daemon that receives time data from time_slave via IPC, performs verification and qualification, and provides validated time information to applications.
 
 Specification
 =============
 
-[Describe the requirements, architecture of any component.] or
+The time_daemon component acts as a verification and publishing layer between the time_slave component and client applications. It receives gPTP time synchronization data from shared memory, validates it through multiple verification stages, and publishes qualified time data via IPC.
 
+The component operates as a continuous loop with the following stages:
 
-How to Teach This
-=================
+1. **Data Reception**: Reads gPTP time synchronization data from shared memory written by time_slave
+2. **Verification Pipeline**: Validates data through three checks:
 
-[How to teach users, new and experienced, how to apply the CR to their work.]
+   * Synchronization status validation
+   * Time jump detection (>500μs between consecutive frames)
+   * Timeout detection (no new data within 3.3 seconds)
 
-.. note::
-   For a CR that adds new functionality or changes behaviour, it is helpful to include a section on how to teach users, new and experienced, how to apply the CR to their work.
+3. **Publishing**: Publishes verified time data with quality indicators to clients via VehicleTime IPC interface at a fixed 250ms interval
+
+Key Behaviors
+-------------
+
+**Startup Stabilization**: Synchronization state changes are not reported during the first 5 seconds after initial synchronization to avoid spurious time jump detection.
+
+**Error Recovery**: Time jump and timeout conditions are non-fatal. The component continues publishing with appropriate status flags set. Time jump condition clears after 2 consecutive valid frames.
+
+**Multi-Client Support**: Multiple client applications can concurrently read published time data.
+
+**Platform Support**: Linux and QNX 8.0 SDP platforms supported for shared memory and IPC operations.
+
+Assumptions of Use
+------------------
+
+The gPTP shared memory must be available and initialized before synchronized time data published by time_daemon is relied upon. Otherwise shared memory access failures or stale data may occur.
 
 Footnotes
 =========
-
-[A collection of footnotes cited in the CR, and a place to list non-inline hyperlink targets.]
-
 
 Further Documentation of the component can be found in the following sections:
 
