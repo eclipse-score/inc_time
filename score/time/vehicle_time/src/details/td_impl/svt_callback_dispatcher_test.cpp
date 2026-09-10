@@ -67,6 +67,62 @@ TEST_F(SvtCallbackDispatcherTest, WorkerDoesNotPollWhileNoCallbackIsRegistered)
     std::this_thread::sleep_for(20 * kPollInterval);
 }
 
+TEST_F(SvtCallbackDispatcherTest, WorkerDoesNotPollBeforeStartEvenWithCallbackRegistered)
+{
+    ServeFramesFromSource();
+    frame_source_.Set(MakeFrame(kSynchronizedStatus));
+
+    dispatcher_->SetStatusChangedCallback([](const VehicleTimeStatus&) {});
+
+    std::this_thread::sleep_for(20 * kPollInterval);
+    EXPECT_EQ(frame_source_.Polls(), 0U);
+}
+
+TEST_F(SvtCallbackDispatcherTest, WorkerStopsPollingAfterLastCallbackUnset)
+{
+    dispatcher_->Start();
+    ServeFramesFromSource();
+    frame_source_.Set(MakeFrame(kSynchronizedStatus));
+
+    Recorder<VehicleTimeStatus> recorder;
+    dispatcher_->SetStatusChangedCallback([&recorder](const VehicleTimeStatus& status) {
+        recorder.Record(status);
+    });
+    ASSERT_TRUE(recorder.WaitForCount(1U));
+
+    dispatcher_->UnsetStatusChangedCallback();
+
+    const auto polls_after_unset = frame_source_.Polls();
+    std::this_thread::sleep_for(20 * kPollInterval);
+    EXPECT_EQ(frame_source_.Polls(), polls_after_unset);
+}
+
+TEST_F(SvtCallbackDispatcherTest, WorkerRestartsWhenCallbackReRegisteredAfterLastUnset)
+{
+    dispatcher_->Start();
+    ServeFramesFromSource();
+    frame_source_.Set(MakeFrame(kSynchronizedStatus));
+
+    Recorder<VehicleTimeStatus> recorder;
+    dispatcher_->SetStatusChangedCallback([&recorder](const VehicleTimeStatus& status) {
+        recorder.Record(status);
+    });
+    ASSERT_TRUE(recorder.WaitForCount(1U));
+
+    dispatcher_->UnsetStatusChangedCallback();
+    const auto polls_after_unset = frame_source_.Polls();
+    std::this_thread::sleep_for(20 * kPollInterval);
+    ASSERT_EQ(frame_source_.Polls(), polls_after_unset);
+
+    // Re-registering must restart the worker and resume polling.
+    dispatcher_->SetStatusChangedCallback([&recorder](const VehicleTimeStatus& status) {
+        recorder.Record(status);
+    });
+
+    ASSERT_TRUE(frame_source_.WaitForAdditionalPolls(1U));
+    ASSERT_TRUE(recorder.WaitForCount(2U));
+}
+
 TEST_F(SvtCallbackDispatcherTest, NoCallbackIsDeliveredWhileReceiveReturnsNullopt)
 {
     dispatcher_->Start();
@@ -649,6 +705,37 @@ TEST_F(SvtCallbackDispatcherTest, UnsetBlocksUntilInFlightCallbackReturns)
 
     release_callback.set_value();
     EXPECT_EQ(unset_done.wait_for(kWaitTimeout), std::future_status::ready);
+}
+
+TEST_F(SvtCallbackDispatcherTest, LastCallbackUnsettingItselfAndRegisteringAnotherRestartsWorker)
+{
+    dispatcher_->Start();
+    ServeFramesFromSource();
+    frame_source_.Set(MakeFrame(kSynchronizedStatus));
+
+    Recorder<VehicleTimeStatus> status_recorder;
+    Recorder<PDelayMeasurementData<VehicleTime>> pdelay_recorder;
+
+    // The sole callback drops the worker to zero subscriptions from the worker thread and, in the
+    // same invocation, registers a different one — exercising the deferred-stop / self-detach path.
+    dispatcher_->SetStatusChangedCallback(
+        [this, &status_recorder, &pdelay_recorder](const VehicleTimeStatus& status) {
+            status_recorder.Record(status);
+            dispatcher_->UnsetStatusChangedCallback();
+            dispatcher_->SetPDelayMeasurementFinishedCallback(
+                [&pdelay_recorder](const PDelayMeasurementData<VehicleTime>& data) {
+                    pdelay_recorder.Record(data);
+                });
+        });
+
+    ASSERT_TRUE(status_recorder.WaitForCount(1U));
+
+    // The newly registered pDelay callback must be serviced by the restarted worker.
+    ASSERT_TRUE(pdelay_recorder.WaitForCount(1U));
+
+    // The status callback removed itself, so it must not fire again.
+    ASSERT_TRUE(frame_source_.WaitForAdditionalPolls(5U));
+    EXPECT_EQ(status_recorder.Count(), 1U);
 }
 
 TEST_F(SvtCallbackDispatcherTest, SettingEmptyCallbackDoesNotInvokeAnything)

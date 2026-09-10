@@ -15,6 +15,7 @@
 #include <score/utility.hpp>
 
 #include <string>
+#include <thread>
 #include <utility>
 
 namespace score
@@ -77,6 +78,13 @@ SvtCallbackDispatcher::SvtCallbackDispatcher(std::shared_ptr<score::td::SvtRecei
       sync_data_slot_{},
       pdelay_slot_{},
       status_slot_{},
+      lifecycle_mutex_{},
+      enabled_{false},
+      sync_present_{false},
+      pdelay_present_{false},
+      status_present_{false},
+      worker_active_{false},
+      worker_thread_id_{},
       worker_mutex_{},
       worker_wakeup_{},
       worker_{}
@@ -85,11 +93,12 @@ SvtCallbackDispatcher::SvtCallbackDispatcher(std::shared_ptr<score::td::SvtRecei
 
 SvtCallbackDispatcher::~SvtCallbackDispatcher() noexcept
 {
+    // The destructor never runs on the worker thread, so joining here is always safe.
     if (worker_.joinable())
     {
+        score::cpp::ignore = worker_.request_stop();
         {
             const std::lock_guard<std::mutex> guard{worker_mutex_};
-            score::cpp::ignore = worker_.request_stop();
             worker_wakeup_.notify_all();
         }
         worker_.join();
@@ -98,42 +107,115 @@ SvtCallbackDispatcher::~SvtCallbackDispatcher() noexcept
 
 void SvtCallbackDispatcher::Start() noexcept
 {
-    worker_ = score::cpp::jthread{score::cpp::jthread::name_hint{std::string{"vt_cb_dispatch"}},
-                                  [this](const score::cpp::stop_token token) noexcept {
-                                      WorkerFunction(token);
-                                  }};
+    const std::lock_guard<std::mutex> guard{lifecycle_mutex_};
+    enabled_ = true;
+    ManageWorkerThreadLifecycleLocked();
 }
 
 void SvtCallbackDispatcher::SetTimeSlaveSyncDataReceivedCallback(
     VehicleTime::TimeSlaveSyncDataReceivedCallback&& callback) noexcept
 {
+    const bool present = !callback.empty();
     sync_data_slot_.Set(std::move(callback));
+    const std::lock_guard<std::mutex> guard{lifecycle_mutex_};
+    sync_present_ = present;
+    ManageWorkerThreadLifecycleLocked();
 }
 
 void SvtCallbackDispatcher::UnsetTimeSlaveSyncDataReceivedCallback() noexcept
 {
     sync_data_slot_.Unset();
+    const std::lock_guard<std::mutex> guard{lifecycle_mutex_};
+    sync_present_ = false;
+    ManageWorkerThreadLifecycleLocked();
 }
 
 void SvtCallbackDispatcher::SetPDelayMeasurementFinishedCallback(
     VehicleTime::PDelayMeasurementFinishedCallback&& callback) noexcept
 {
+    const bool present = !callback.empty();
     pdelay_slot_.Set(std::move(callback));
+    const std::lock_guard<std::mutex> guard{lifecycle_mutex_};
+    pdelay_present_ = present;
+    ManageWorkerThreadLifecycleLocked();
 }
 
 void SvtCallbackDispatcher::UnsetPDelayMeasurementFinishedCallback() noexcept
 {
     pdelay_slot_.Unset();
+    const std::lock_guard<std::mutex> guard{lifecycle_mutex_};
+    pdelay_present_ = false;
+    ManageWorkerThreadLifecycleLocked();
 }
 
 void SvtCallbackDispatcher::SetStatusChangedCallback(VehicleTime::StatusChangedCallback&& callback) noexcept
 {
+    const bool present = !callback.empty();
     status_slot_.Set(std::move(callback));
+    const std::lock_guard<std::mutex> guard{lifecycle_mutex_};
+    status_present_ = present;
+    ManageWorkerThreadLifecycleLocked();
 }
 
 void SvtCallbackDispatcher::UnsetStatusChangedCallback() noexcept
 {
     status_slot_.Unset();
+    const std::lock_guard<std::mutex> guard{lifecycle_mutex_};
+    status_present_ = false;
+    ManageWorkerThreadLifecycleLocked();
+}
+
+bool SvtCallbackDispatcher::OnWorkerThread() const noexcept
+{
+    return std::this_thread::get_id() == worker_thread_id_.load(std::memory_order_relaxed);
+}
+
+void SvtCallbackDispatcher::ManageWorkerThreadLifecycleLocked() noexcept
+{
+    const bool should_run = enabled_ && (sync_present_ || pdelay_present_ || status_present_);
+
+    if (should_run && !worker_active_)
+    {
+        // Reap a previously stopped worker (e.g. one that stopped itself from within a callback)
+        // before spinning up a replacement. Never join ourselves — that would deadlock.
+        if (worker_.joinable() && !OnWorkerThread())
+        {
+            worker_.join();
+            worker_ = score::cpp::jthread{};
+        }
+        else if (worker_.joinable())
+        {
+            // Reaching here means worker_ is still joinable and refers to the current thread: a callback
+            // running on the worker thread unset the last subscription (deferring its own join) and then
+            // re-subscribed. Detaching drops that self-reference; otherwise the assignment below would
+            // move-assign over a joinable handle, which joins the worker thread to itself and deadlocks.
+            worker_.detach();
+        }
+        worker_ = score::cpp::jthread{score::cpp::jthread::name_hint{std::string{"vt_cb_dispatch"}},
+                                      [this](const score::cpp::stop_token token) noexcept {
+                                          worker_thread_id_.store(std::this_thread::get_id(), std::memory_order_relaxed);
+                                          WorkerFunction(token);
+                                      }};
+        worker_active_ = true;
+    }
+    else if (!should_run && worker_active_)
+    {
+        score::cpp::ignore = worker_.request_stop();
+        {
+            const std::lock_guard<std::mutex> guard{worker_mutex_};
+            worker_wakeup_.notify_all();
+        }
+        worker_active_ = false;
+
+        // A callback that removed the last subscription runs on the worker thread itself; joining
+        // there would deadlock, so we defer the join to the next Start()/Set() or the destructor.
+        if (!OnWorkerThread())
+        {
+            worker_.join();
+            worker_ = score::cpp::jthread{};
+            worker_thread_id_.store(std::thread::id{}, std::memory_order_relaxed);
+        }
+    }
 }
 
 void SvtCallbackDispatcher::WorkerFunction(const score::cpp::stop_token& token) noexcept

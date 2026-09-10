@@ -25,9 +25,11 @@
 #include <score/jthread.hpp>
 #include <score/stop_token.hpp>
 
+#include <atomic>
 #include <chrono>
 #include <memory>
 #include <mutex>
+#include <thread>
 
 namespace score
 {
@@ -43,9 +45,10 @@ ClockStatus<VehicleTime::StatusFlag> ConvertPtpStatus(const score::td::svt::Time
 /// @brief Owns the worker thread that delivers vehicle-time subscription callbacks.
 ///
 /// The TimeDaemon IPC is a shared-memory segment without a notification facility, so the
-/// dispatcher owns a dedicated worker thread that polls the receiver every @p poll_interval
-/// while at least one callback is registered (no polling happens without subscribers).
-/// The worker is started by @c Start() and joined in the destructor.
+/// dispatcher owns a dedicated worker thread that polls the receiver every @p poll_interval.
+/// @c Start() enables dispatching once the receiver is initialised; after that the worker thread
+/// is created lazily when the first callback is registered and joined again when the last callback
+/// is removed. Registering a callback afterwards restarts the worker.
 /// Every frame read from the receiver is offered part by part to the three @c SvtCallbackWrapper s, which
 /// dispatch on the worker thread when the part differs from what they last delivered:
 ///  - @c TimeSlaveSyncData — the sync/follow-up part;
@@ -54,7 +57,8 @@ ClockStatus<VehicleTime::StatusFlag> ConvertPtpStatus(const score::td::svt::Time
 /// A newly registered callback (first registration, re-registration, or replacement) always receives
 /// the first frame polled after its registration, and afterwards only changes.
 ///
-/// Set/Unset are safe to call concurrently with an in-flight invocation (see @c SvtCallbackWrapper).
+/// Set/Unset are safe to call concurrently with an in-flight invocation (see @c SvtCallbackWrapper),
+/// including a callback that unsets or replaces itself from the worker thread.
 class SvtCallbackDispatcher final
 {
   public:
@@ -67,7 +71,9 @@ class SvtCallbackDispatcher final
     SvtCallbackDispatcher(SvtCallbackDispatcher&&) = delete;
     SvtCallbackDispatcher& operator=(SvtCallbackDispatcher&&) = delete;
 
-    /// @brief Starts the worker thread. Must be called at most once, after the receiver is initialised.
+    /// @brief Enables dispatching once the receiver is initialised. Must be called at most once.
+    ///
+    /// The worker thread itself is only spun up while at least one callback is registered.
     void Start() noexcept;
 
     void SetTimeSlaveSyncDataReceivedCallback(VehicleTime::TimeSlaveSyncDataReceivedCallback&& callback) noexcept;
@@ -99,12 +105,29 @@ class SvtCallbackDispatcher final
     /// @brief Reads one frame from the receiver and offers each part to its slot.
     void PollAndDispatch() noexcept;
 
+    /// @brief Starts or stops the worker so it runs exactly while enabled and at least one callback
+    ///        is registered. Must be called with @c lifecycle_mutex_ held.
+    void ManageWorkerThreadLifecycleLocked() noexcept;
+
+    /// @brief Returns @c true when called from the worker thread (used to defer a self-triggered join).
+    bool OnWorkerThread() const noexcept;
+
     std::shared_ptr<score::td::SvtReceiver> svt_receiver_;
     const std::chrono::milliseconds poll_interval_;
 
     SvtCallbackWrapper<VehicleTime::TimeSlaveSyncDataReceivedCallback, score::td::svt::SyncFupSnapshot> sync_data_slot_;
     SvtCallbackWrapper<VehicleTime::PDelayMeasurementFinishedCallback, score::td::svt::PDelayDataSnapshot> pdelay_slot_;
     SvtCallbackWrapper<VehicleTime::StatusChangedCallback, ClockStatus<VehicleTime::StatusFlag>> status_slot_;
+
+    // Guards the worker lifecycle state below. Never held while a slot mutex is taken, so that a
+    // callback may (re-)register from the worker thread without risking a lock-order inversion.
+    std::mutex lifecycle_mutex_;
+    bool enabled_;
+    bool sync_present_;
+    bool pdelay_present_;
+    bool status_present_;
+    bool worker_active_;
+    std::atomic<std::thread::id> worker_thread_id_;
 
     std::mutex worker_mutex_;
     score::concurrency::InterruptibleConditionalVariable worker_wakeup_;
