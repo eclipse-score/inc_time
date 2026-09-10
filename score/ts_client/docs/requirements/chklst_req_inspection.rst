@@ -189,6 +189,3 @@ And also the following AoUs in "valid" state and with "inspected" tag set (for t
    :columns: id;status;tags
    :colwidths: 25,25,25
    :sort: title
-
-.. attention::
-    The above tables filtering must be updated according to your Component.

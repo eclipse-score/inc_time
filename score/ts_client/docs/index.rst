@@ -27,7 +27,7 @@ Time Sync Client
    :tags: ts_client
 
 .. comp:: Time Sync Client
-   :id: comp__time_ts_client
+   :id: comp__ts_client
    :security: NO
    :safety: ASIL_B
    :status: valid
@@ -37,28 +37,39 @@ Time Sync Client
 Abstract
 ========
 
-[A short (~200 word) description of the component.]
-
+This component encapsulates the IPC mechanisms for time synchronization data exchange between the components time_slave and time_daemon.
 
 Specification
 =============
 
-[Describe the requirements, architecture of any component.] or
+The ts_client component provides shared memory IPC channel for gPTP time synchronization data exchange between one publisher and multiple readers within ECU.
 
+Channel lifecycle follows producer-consumer model:
 
-How to Teach This
-=================
+1. **Channel setup**: Publisher creates shared memory channel and Receiver opens existing channel in read-only mode.
+2. **Validation and synchronization**: Receiver validates shared memory region on open, then reads data through lock-free synchronization with concurrent write detection.
+3. **Data exchange**: Channel carries synchronization status, Sync/FollowUp metadata, PDelay metadata, and time correlation data for downstream processing.
 
-[How to teach users, new and experienced, how to apply the CR to their work.]
+Key Behaviors
+-------------
 
-.. note::
-   For a CR that adds new functionality or changes behaviour, it is helpful to include a section on how to teach users, new and experienced, how to apply the CR to their work.
+**Lock-Free Multi-Reader Access**: Multiple readers can access same shared memory channel concurrently while single publisher writes.
+
+**Data Integrity Handling**: Receiver reports invalid or corrupted reads when integrity checks fail.
+
+**Platform Support**: Shared memory IPC flow supported on Linux and QNX 8.0 SDP.
+
+**Error Reporting**: Shared memory create/open/validation failures are logged via score::mw::log.
+
+**Cache-Aware Layout**: Shared memory layout is optimized to reduce cache contention between writer and readers.
+
+Assumptions of Use
+------------------
+
+Only one publisher process may open and write given shared memory segment. Users must configure permissions so publisher has write access and readers have read access.
 
 Footnotes
 =========
-
-[A collection of footnotes cited in the CR, and a place to list non-inline hyperlink targets.]
-
 
 Further Documentation of the component can be found in the following sections:
 
