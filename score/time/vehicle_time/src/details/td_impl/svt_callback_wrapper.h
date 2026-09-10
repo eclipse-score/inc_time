@@ -10,8 +10,8 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
-#ifndef SCORE_TIME_VEHICLE_TIME_SRC_DETAILS_TD_IMPL_CALLBACK_SLOT_H
-#define SCORE_TIME_VEHICLE_TIME_SRC_DETAILS_TD_IMPL_CALLBACK_SLOT_H
+#ifndef SCORE_TIME_VEHICLE_TIME_SRC_DETAILS_TD_IMPL_SVT_CALLBACK_WRAPPER_H
+#define SCORE_TIME_VEHICLE_TIME_SRC_DETAILS_TD_IMPL_SVT_CALLBACK_WRAPPER_H
 
 // Internal header — include ONLY from translation units under vehicle_time/src/details/td_impl/.
 // NOT part of the public API of td_impl.
@@ -46,17 +46,17 @@ namespace detail
 ///       the running invocation completes normally on a shared handle that outlives the slot contents.
 ///
 /// @tparam Callback  A callable wrapper offering @c empty() and @c operator() (e.g. @c score::cpp::callback).
-/// @tparam Key       Equality-comparable, copyable type identifying the value last delivered.
-template <typename Callback, typename Key>
-class CallbackSlot final
+/// @tparam Data      Equality-comparable, copyable type identifying the value last delivered.
+template <typename Callback, typename Data>
+class SvtCallbackWrapper final
 {
   public:
-    CallbackSlot() noexcept = default;
-    ~CallbackSlot() noexcept = default;
-    CallbackSlot(const CallbackSlot&) = delete;
-    CallbackSlot& operator=(const CallbackSlot&) = delete;
-    CallbackSlot(CallbackSlot&&) = delete;
-    CallbackSlot& operator=(CallbackSlot&&) = delete;
+    SvtCallbackWrapper() noexcept = default;
+    ~SvtCallbackWrapper() noexcept = default;
+    SvtCallbackWrapper(const SvtCallbackWrapper&) = delete;
+    SvtCallbackWrapper& operator=(const SvtCallbackWrapper&) = delete;
+    SvtCallbackWrapper(SvtCallbackWrapper&&) = delete;
+    SvtCallbackWrapper& operator=(SvtCallbackWrapper&&) = delete;
 
     /// @brief Installs @p callback, replacing any previous one. An empty callback behaves like @c Unset().
     ///
@@ -65,7 +65,7 @@ class CallbackSlot final
     {
         const std::lock_guard<std::recursive_mutex> lock{mutex_};
         callback_ = callback.empty() ? nullptr : std::make_shared<Callback>(std::move(callback));
-        last_key_.reset();
+        last_data_.reset();
     }
 
     /// @brief Removes the stored callback.
@@ -73,7 +73,7 @@ class CallbackSlot final
     {
         const std::lock_guard<std::recursive_mutex> lock{mutex_};
         callback_.reset();
-        last_key_.reset();
+        last_data_.reset();
     }
 
     /// @brief Returns @c true if a callback is currently installed.
@@ -83,21 +83,21 @@ class CallbackSlot final
         return callback_ != nullptr;
     }
 
-    /// @brief Invokes the stored callback with @p argument unless @p key equals the key of the
+    /// @brief Invokes the stored callback with @p argument unless @p data equals the data of the
     ///        previous delivery to the same callback.
     ///
     /// Must be called from the worker thread only.
     ///
-    /// @return @c true if the callback was invoked, @c false if none is installed or @p key is unchanged.
+    /// @return @c true if the callback was invoked, @c false if none is installed or @p data is unchanged.
     template <typename Argument>
-    bool InvokeIfChanged(const Key& key, const Argument& argument) noexcept
+    bool InvokeIfChanged(const Data& data, const Argument& argument) noexcept
     {
         const std::lock_guard<std::recursive_mutex> lock{mutex_};
-        if ((callback_ == nullptr) || (last_key_.has_value() && (last_key_.value() == key)))
+        if ((callback_ == nullptr) || (last_data_.has_value() && (last_data_.value() == data)))
         {
             return false;
         }
-        last_key_ = key;
+        last_data_ = data;
 
         // Local copy keeps the callback alive should it Unset() or replace itself while running.
         const std::shared_ptr<Callback> callback = callback_;
@@ -108,11 +108,11 @@ class CallbackSlot final
   private:
     mutable std::recursive_mutex mutex_;
     std::shared_ptr<Callback> callback_{};
-    std::optional<Key> last_key_{};
+    std::optional<Data> last_data_{};
 };
 
 }  // namespace detail
 }  // namespace time
 }  // namespace score
 
-#endif  // SCORE_TIME_VEHICLE_TIME_SRC_DETAILS_TD_IMPL_CALLBACK_SLOT_H
+#endif  // SCORE_TIME_VEHICLE_TIME_SRC_DETAILS_TD_IMPL_SVT_CALLBACK_WRAPPER_H

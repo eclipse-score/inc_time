@@ -10,7 +10,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
-#include "score/time/vehicle_time/src/details/td_impl/callback_slot.h"
+#include "score/time/vehicle_time/src/details/td_impl/svt_callback_wrapper.h"
 
 #include <score/callback.hpp>
 
@@ -34,7 +34,7 @@ namespace
 {
 
 using TestCallback = score::cpp::callback<void(const int&), 64U>;
-using Slot = CallbackSlot<TestCallback, int>;
+using Slot = SvtCallbackWrapper<TestCallback, int>;
 
 /// @brief One-shot gate that lets one thread block until another thread opens it.
 class Gate
@@ -69,14 +69,14 @@ class Gate
     bool open_{false};
 };
 
-TEST(CallbackSlotTest, InvokeIfChangedReturnsFalseWhenNoCallbackIsSet)
+TEST(SvtCallbackWrapperTest, InvokeIfChangedReturnsFalseWhenNoCallbackIsSet)
 {
     Slot slot;
     EXPECT_FALSE(slot.IsSet());
     EXPECT_FALSE(slot.InvokeIfChanged(1, 1));
 }
 
-TEST(CallbackSlotTest, InvokeIfChangedCallsStoredCallbackWithArgumentOnEveryNewKey)
+TEST(SvtCallbackWrapperTest, InvokeIfChangedCallsStoredCallbackWithArgumentOnEveryNewKey)
 {
     Slot slot;
     std::vector<int> received;
@@ -90,7 +90,7 @@ TEST(CallbackSlotTest, InvokeIfChangedCallsStoredCallbackWithArgumentOnEveryNewK
     EXPECT_EQ(received, (std::vector<int>{70, 80}));
 }
 
-TEST(CallbackSlotTest, InvokeIfChangedSkipsRepeatedKey)
+TEST(SvtCallbackWrapperTest, InvokeIfChangedSkipsRepeatedKey)
 {
     Slot slot;
     int invocations{0};
@@ -105,7 +105,7 @@ TEST(CallbackSlotTest, InvokeIfChangedSkipsRepeatedKey)
     EXPECT_EQ(invocations, 2);
 }
 
-TEST(CallbackSlotTest, SetForgetsLastKeySoNewCallbackIsInvokedWithUnchangedKey)
+TEST(SvtCallbackWrapperTest, SetForgetsLastKeySoNewCallbackIsInvokedWithUnchangedKey)
 {
     Slot slot;
     slot.Set([](const int&) {});
@@ -120,7 +120,7 @@ TEST(CallbackSlotTest, SetForgetsLastKeySoNewCallbackIsInvokedWithUnchangedKey)
     EXPECT_EQ(replacement_invocations, 1);
 }
 
-TEST(CallbackSlotTest, UnsetRemovesCallbackAndForgetsLastKey)
+TEST(SvtCallbackWrapperTest, UnsetRemovesCallbackAndForgetsLastKey)
 {
     Slot slot;
     int invocations{0};
@@ -140,7 +140,7 @@ TEST(CallbackSlotTest, UnsetRemovesCallbackAndForgetsLastKey)
     EXPECT_EQ(invocations, 2);
 }
 
-TEST(CallbackSlotTest, SettingEmptyCallbackBehavesLikeUnset)
+TEST(SvtCallbackWrapperTest, SettingEmptyCallbackBehavesLikeUnset)
 {
     Slot slot;
     slot.Set([](const int&) {});
@@ -150,7 +150,7 @@ TEST(CallbackSlotTest, SettingEmptyCallbackBehavesLikeUnset)
     EXPECT_FALSE(slot.InvokeIfChanged(0, 0));
 }
 
-TEST(CallbackSlotTest, UnsetFromWithinCallbackDoesNotDeadlockAndTakesEffectAfterwards)
+TEST(SvtCallbackWrapperTest, UnsetFromWithinCallbackDoesNotDeadlockAndTakesEffectAfterwards)
 {
     Slot slot;
     int invocations{0};
@@ -165,7 +165,7 @@ TEST(CallbackSlotTest, UnsetFromWithinCallbackDoesNotDeadlockAndTakesEffectAfter
     EXPECT_EQ(invocations, 1);
 }
 
-TEST(CallbackSlotTest, SetFromWithinCallbackReplacesCallbackForNextInvocation)
+TEST(SvtCallbackWrapperTest, SetFromWithinCallbackReplacesCallbackForNextInvocation)
 {
     Slot slot;
     std::vector<int> trace;
@@ -181,7 +181,7 @@ TEST(CallbackSlotTest, SetFromWithinCallbackReplacesCallbackForNextInvocation)
     EXPECT_EQ(trace, (std::vector<int>{1, 2}));
 }
 
-TEST(CallbackSlotTest, UnsetFromAnotherThreadBlocksUntilInFlightInvocationReturns)
+TEST(SvtCallbackWrapperTest, UnsetFromAnotherThreadBlocksUntilInFlightInvocationReturns)
 {
     Slot slot;
     Gate callback_entered;
@@ -207,7 +207,7 @@ TEST(CallbackSlotTest, UnsetFromAnotherThreadBlocksUntilInFlightInvocationReturn
     EXPECT_FALSE(slot.IsSet());
 }
 
-TEST(CallbackSlotTest, SetFromAnotherThreadBlocksUntilInFlightInvocationReturns)
+TEST(SvtCallbackWrapperTest, SetFromAnotherThreadBlocksUntilInFlightInvocationReturns)
 {
     Slot slot;
     Gate callback_entered;

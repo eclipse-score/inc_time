@@ -21,11 +21,13 @@ load("@score_baselibs//score/language/safecpp:toolchain_features.bzl", "COMPILER
 cc_library(
     name = "td_impl",
     srcs = [
+        "svt_callback_dispatcher.cpp",
         "vehicle_clock_backend_impl.cpp",
         "//score/time/vehicle_time/src/details:logging_contexts",  # internal header
     ],
     hdrs = [
-        "callback_slot.h",
+        "svt_callback_wrapper.h",
+        "svt_callback_dispatcher.h",
         "vehicle_clock_backend_impl.h",
     ],
     features = COMPILER_WARNING_FEATURES,
@@ -41,10 +43,10 @@ cc_library(
 )
 
 cc_test(
-    name = "callback_slot_test",
+    name = "svt_callback_wrapper_test",
     srcs = [
-        "callback_slot.h",
-        "callback_slot_test.cpp",
+        "svt_callback_wrapper.h",
+        "svt_callback_wrapper_test.cpp",
     ],
     features = COMPILER_WARNING_FEATURES,
     tags = ["unit"],
@@ -56,9 +58,37 @@ cc_test(
 )
 
 cc_test(
+    name = "svt_callback_dispatcher_test",
+    srcs = [
+        "svt_callback_dispatcher.cpp",
+        "svt_callback_dispatcher.h",
+        "svt_callback_wrapper.h",
+        "svt_callback_dispatcher_test.cpp",
+        "svt_test_helpers.h",
+    ],
+    features = COMPILER_WARNING_FEATURES,
+    tags = [
+        "exclusive",
+        "unit",
+    ],
+    deps = [
+        "//score/time/vehicle_time/src:vehicle_clock",
+        "//score/time_daemon/src/ipc:svt_receiver_mock",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+        "@score_baselibs//score/concurrency:condition_variable",
+        "@score_baselibs//score/language/futurecpp",
+        "@score_baselibs//score/language/safecpp/coverage_termination_handler",
+    ],
+)
+
+cc_test(
     name = "vehicle_clock_backend_impl_test",
     srcs = [
-        "callback_slot.h",
+        "svt_callback_wrapper.h",
+        "svt_callback_dispatcher.cpp",
+        "svt_callback_dispatcher.h",
+        "svt_test_helpers.h",
         "vehicle_clock_backend_impl.cpp",
         "vehicle_clock_backend_impl.h",
         "vehicle_clock_backend_impl_test.cpp",
@@ -86,7 +116,8 @@ cc_test(
 cc_unit_test_suites_for_host_and_qnx(
     name = "unit_test_suite",
     cc_unit_tests = [
-        ":callback_slot_test",
+        ":svt_callback_dispatcher_test",
+        ":svt_callback_wrapper_test",
         ":vehicle_clock_backend_impl_test",
     ],
     visibility = ["//score/time/vehicle_time:__subpackages__"],
