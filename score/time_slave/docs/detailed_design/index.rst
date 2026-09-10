@@ -118,104 +118,54 @@ The data and control flow between units is presented in the following diagram:
 
 On this view you could see several "workers" scopes:
 
-1. RxThread scope
-2. PdelayThread scope
-3. Main thread (periodic publish) scope
+1. RxThread scope — receive raw gPTP Ethernet frames, decode PTP messages, correlate Sync/FollowUp and handle Pdelay messages
+2. PdelayThread scope — periodically transmit PDelayReq frames
+3. Main thread scope — periodically publish aggregated snapshot to shared memory
 
-Each control flow is implemented with the dedicated thread and is independent from another ones.
+See ``gptp_engine.h`` for detailed threading model, control flow responsibilities, and concurrency aspects.
 
 Control Flows
 ^^^^^^^^^^^^^
 
-RxThread Scope
-''''''''''''''
+Each control flow has dedicated thread and runs independently.
 
-This control flow is responsible for the:
+- **RxThread scope**
 
-1. receive raw gPTP Ethernet frames with hardware timestamps from the NIC via raw sockets
-2. decode and parse the PTP messages (Sync, FollowUp, PdelayResp, PdelayRespFollowUp)
-3. correlate Sync/FollowUp pairs and compute clock offset and neighborRateRatio
-4. update the shared ``PtpTimeInfo`` snapshot under mutex protection
+  #. receive raw gPTP Ethernet frames with hardware timestamps from NIC via raw sockets
+  #. decode and parse PTP messages (Sync, FollowUp, PdelayResp, PdelayRespFollowUp, PdelayReq)
+  #. depending on message type:
+    #. correlate Sync/FollowUp pairs and compute clock offset and neighborRateRatio. Update shared snapshot under mutex protection
+    #. correlate PdelayResp/PdelayRespFollowUp pairs with sent PdelayReq using the PeerDelayMeasurer unit and compute the propagation delay as defined in the IEEE 802.1AS standard
+    #. react on incoming PdelayReq by sending PdelayResp and PdelayRespFollowUp
 
-PdelayThread Scope
-''''''''''''''''''
+- **PdelayThread scope**
 
-This control flow is responsible for the:
+  #. delay sending the first PdelayReq by the configured pdelay_warmup timespan
+  #. periodically trigger the PeerDelayMeasurer unit to send PdelayReq frames and capture hardware transmit timestamps
 
-1. periodically transmit PDelayReq frames and capture hardware transmit timestamps
-2. coordinate with the RxThread to receive PDelayResp and PDelayRespFollowUp messages
-3. compute the peer delay using the IEEE 802.1AS formula: ``path_delay = ((t2 - t1) + (t4 - t3c)) / 2``
+- **Main thread (periodic publish) scope**
 
-Main Thread (Periodic Publish) Scope
-''''''''''''''''''''''''''''''''''''
-
-This control flow is responsible for the:
-
-1. periodically call ``GptpEngine::FinalizeSnapshot()`` to check timeout and commit the pending snapshot
-2. call ``GptpEngine::ReadPTPSnapshot(data)`` to copy the latest ``GptpIpcData`` into a local variable
-3. publish to shared memory via ``GptpIpcPublisher::Publish(data)``
+  #. call ``GptpEngine::FinalizeSnapshot()`` to check timeout and commit pending snapshot
+  #. call ``GptpEngine::ReadPTPSnapshot(data)`` to copy latest ``GptpIpcData`` to local variable
+  #. publish snapshot via ``GptpIpcPublisher::Publish(data)``
 
 Data Types or Events
 ^^^^^^^^^^^^^^^^^^^^
 
-There are several data types, which components are communicating to each other:
+Main data exchanged between units:
 
-PTPMessage
-''''''''''
-
-``PTPMessage`` is a union-based container for decoded gPTP messages including the hardware receive timestamp. It is produced by ``MessageParser`` and consumed by ``SyncStateMachine`` and ``PeerDelayMeasurer``.
-
-SyncResult
-''''''''''
-
-``SyncResult`` is produced by ``SyncStateMachine::OnFollowUp()`` and contains the computed master timestamp, clock offset, Sync/FollowUp data, and time jump flags (forward/backward).
-
-PDelayResult
-''''''''''''
-
-``PDelayResult`` is produced by ``PeerDelayMeasurer`` and contains the computed path delay in nanoseconds and a validity flag.
-
-PtpTimeInfo
-'''''''''''
-
-``PtpTimeInfo`` is the TimeDaemon-internal aggregated snapshot. It is **not** the shared memory type; it is produced by ``ShmPTPEngine::ReadPTPSnapshot()`` by field-mapping from ``GptpIpcData`` into the format expected by the TimeDaemon pipeline.
+- **PTPMessage** — union-based container for decoded gPTP messages plus hardware receive timestamp; produced by ``MessageParser`` and consumed by ``SyncStateMachine`` and ``PeerDelayMeasurer``
+- **SyncResult** — produced by ``SyncStateMachine::OnFollowUp()``; includes computed master timestamp, clock offset, Sync/FollowUp data, and time-jump flags
+- **PDelayResult** — produced by ``PeerDelayMeasurer``; includes computed path delay in nanoseconds and validity flag
+- **PtpTimeInfo** — TimeDaemon-internal aggregated snapshot, not shared-memory type; produced by ``ShmPTPEngine::ReadPTPSnapshot()`` by mapping from ``GptpIpcData``
 
 Units Within Time Slave
 -----------------------
 
-The following units comprise TimeSlave's internal implementation:
+GptpEngine
+~~~~~~~~~~
 
-TimeSlave Application Unit
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-The ``TimeSlave Application`` component is the main entry point for the TimeSlave process. It extends ``score::mw::lifecycle::Application`` and is responsible for orchestrating the overall lifecycle of the GptpEngine and the IPC publisher.
-
-Implementation Requirements
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-The ``TimeSlave Application`` has the following requirements:
-
-- The ``TimeSlave Application`` shall implement the ``Initialize()`` method to create the ``GptpEngine`` with configured options, initialize the ``GptpIpcPublisher`` (creates the shared memory segment), and create the ``HighPrecisionLocalSteadyClock`` for the engine
-- The ``TimeSlave Application`` shall implement the ``Run()`` method to enter a periodic publish loop (50 ms interval) and monitor the ``stop_token`` for graceful shutdown
-- On each loop iteration, ``TimeSlave Application`` shall call ``GptpEngine::FinalizeSnapshot()``, then ``GptpEngine::ReadPTPSnapshot(data)``, and publish the resulting ``GptpIpcData`` via ``GptpIpcPublisher::Publish(data)``
-- The ``TimeSlave Application`` shall call ``GptpEngine::Deinitialize()`` and ``GptpIpcPublisher::Destroy()`` after the ``stop_token`` is set
-
-GptpEngine Unit
-~~~~~~~~~~~~~~~
-
-The ``GptpEngine`` component is the core gPTP protocol engine. It manages two background threads (RxThread and PdelayThread) for network I/O and peer delay measurement, and exposes a thread-safe ``ReadPTPSnapshot()`` method for the main thread to read the latest time measurement.
-
-Implementation Requirements
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-The ``GptpEngine`` has the following requirements:
-
-- The ``GptpEngine`` shall manage an RxThread for receiving and parsing gPTP frames from raw Ethernet sockets
-- The ``GptpEngine`` shall manage a PdelayThread for periodic peer delay measurement
-- The ``GptpEngine`` shall provide a ``FinalizeSnapshot()`` method that checks for sync timeout, applies status flags, and commits the pending snapshot to the current snapshot; this must be called before ``ReadPTPSnapshot()``
-- The ``GptpEngine`` shall provide a ``ReadPTPSnapshot(GptpIpcData&)`` method that copies the latest committed snapshot into the caller's buffer and returns false only if the engine is not initialized
-- The ``GptpEngine`` shall support configurable parameters via ``GptpEngineOptions`` (interface name, PDelay interval, PDelay warmup, sync timeout, time-jump threshold, PHC configuration)
-- The ``GptpEngine`` shall support exchangeability of the raw socket implementation for different platforms (Linux, QNX)
+The ``GptpEngine`` runs RxThread and PdelayThread, and provides ``FinalizeSnapshot()`` + ``ReadPTPSnapshot()`` for periodic publish logic.
 
 Class View
 ^^^^^^^^^^
@@ -252,13 +202,11 @@ The GptpEngine operates with two background threads. The threading model is repr
 Concurrency Aspects
 ^^^^^^^^^^^^^^^^^^^
 
-The ``GptpEngine`` uses the following synchronization mechanisms:
+- ``std::mutex`` protects ``pending_snapshot_`` and ``current_snapshot_`` (both ``GptpIpcData``): RxThread writes pending; main thread finalizes and reads current
+- ``PeerDelayMeasurer`` uses internal ``std::mutex`` to synchronize ``SendRequest()`` (PdelayThread) with ``OnResponse()`` / ``OnResponseFollowUp()`` (RxThread)
+- ``SyncStateMachine`` uses ``std::atomic<bool>`` timeout flag written by RxThread and read by main thread
 
-- A ``std::mutex`` protects the ``pending_snapshot_`` and ``current_snapshot_`` fields (both ``GptpIpcData``): the RxThread writes ``pending_snapshot_``; the main thread calls ``FinalizeSnapshot()`` (commits pending to current) and ``ReadPTPSnapshot()`` (reads current)
-- The ``PeerDelayMeasurer`` uses its own ``std::mutex`` to synchronize between the PdelayThread (``SendRequest()``) and the RxThread (``OnResponse()``, ``OnResponseFollowUp()``)
-- The ``SyncStateMachine`` uses ``std::atomic<bool>`` for the timeout flag, which is read from the main thread and written from the RxThread
-
-Hardware timestamping fallback
+Hardware Timestamping Fallback
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 During ``Initialize()``, ``GptpEngine`` calls ``RawSocket::EnableHwTimestamping()`` to request NIC-level receive timestamps (``SO_TIMESTAMPING`` on Linux). If the NIC does not support hardware timestamping, the call returns ``false`` and a warning is logged:
@@ -289,55 +237,12 @@ The engine continues to run normally. The difference between the two modes:
      - High (sub-microsecond typical)
      - Reduced (jitter depends on OS scheduling latency)
 
-The fallback does not affect protocol correctness — Sync/FollowUp correlation and peer delay measurement continue to work — but the computed clock offset will be less accurate due to higher receive timestamp jitter.
+The fallback does not affect protocol correctness -- Sync/FollowUp correlation and peer delay measurement continue to work -- but the computed clock offset will be less accurate due to higher receive timestamp jitter.
 
-FrameCodec Unit
-~~~~~~~~~~~~~~~
+PeerDelayMeasurer
+~~~~~~~~~~~~~~~~~~~~~~~
 
-The ``FrameCodec`` component handles raw Ethernet frame encoding and decoding for gPTP communication.
-
-Implementation Requirements
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-The ``FrameCodec`` has the following requirements:
-
-- The ``FrameCodec`` shall parse incoming Ethernet frames, extracting source/destination MAC addresses, handling 802.1Q VLAN tags, and validating the EtherType (``0x88F7``)
-- The ``FrameCodec`` shall construct outgoing Ethernet headers for PDelayReq frames using the standard PTP multicast destination MAC (``01:80:C2:00:00:0E``)
-
-MessageParser Unit
-~~~~~~~~~~~~~~~~~~
-
-The ``MessageParser`` component parses the PTP wire format (IEEE 1588-v2) from raw payload bytes.
-
-Implementation Requirements
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-The ``MessageParser`` has the following requirements:
-
-- The ``MessageParser`` shall validate the PTP header (version, domain, message length)
-- The ``MessageParser`` shall decode all relevant message types: Sync, FollowUp, PdelayReq, PdelayResp, PdelayRespFollowUp
-- The ``MessageParser`` shall use packed wire structures (``__attribute__((packed))``) for direct memory mapping of PTP messages
-
-SyncStateMachine Unit
-~~~~~~~~~~~~~~~~~~~~~
-
-The ``SyncStateMachine`` component implements the two-step Sync/FollowUp correlation logic. It correlates incoming Sync and FollowUp messages by sequence ID, computes the clock offset and neighbor rate ratio, and detects time jumps.
-
-Implementation Requirements
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-The ``SyncStateMachine`` has the following requirements:
-
-- The ``SyncStateMachine`` shall store Sync messages and correlate them with subsequent FollowUp messages by sequence ID
-- The ``SyncStateMachine`` shall compute the clock offset: ``offset_ns = master_time - slave_receive_time - path_delay``
-- The ``SyncStateMachine`` shall compute the ``neighborRateRatio`` from successive Sync intervals (master vs. slave clock progression)
-- The ``SyncStateMachine`` shall detect forward and backward time jumps against configurable thresholds
-- The ``SyncStateMachine`` shall provide thread-safe timeout detection via ``std::atomic<bool>``, set when no Sync is received within the configured timeout
-
-PeerDelayMeasurer Unit
-~~~~~~~~~~~~~~~~~~~~~~
-
-The ``PeerDelayMeasurer`` component implements the IEEE 802.1AS two-step peer delay measurement protocol. It manages the four timestamps (``t1``, ``t2``, ``t3c``, ``t4``) across two threads.
+The ``PeerDelayMeasurer`` unit implements the IEEE 802.1AS two-step peer delay measurement protocol. It manages the four timestamps (``t1``, ``t2``, ``t3c``, ``t4``) across two threads.
 
 Timestamp Definitions
 ^^^^^^^^^^^^^^^^^^^^^
@@ -356,11 +261,11 @@ Timestamp Definitions
      - HW transmit timestamp of the PDelayReq frame leaving the slave NIC
    * - ``t2``
      - PDelayResp (RX)
-     - Master → carried in PDelayResp body
+     - Master -> carried in PDelayResp body
      - HW receive timestamp of the PDelayReq frame arriving at the master NIC
    * - ``t3c``
      - PDelayRespFollowUp
-     - Master → carried in PDelayRespFollowUp body
+     - Master -> carried in PDelayRespFollowUp body
      - HW transmit timestamp of the PDelayResp frame leaving the master NIC ("corrected" because it includes the master's turnaround correction)
    * - ``t4``
      - PDelayResp (RX)
@@ -369,36 +274,14 @@ Timestamp Definitions
 
 The peer delay formula is: ``path_delay = ((t2 - t1) + (t4 - t3c)) / 2``
 
-- ``(t2 - t1)`` = propagation time from slave → master
-- ``(t4 - t3c)`` = propagation time from master → slave
+- ``(t2 - t1)`` = propagation time from slave -> master
+- ``(t4 - t3c)`` = propagation time from master -> slave
 - The average of the two gives the one-way link delay
 
-Implementation Requirements
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
+PhcAdjuster
+~~~~~~~~~~~
 
-The ``PeerDelayMeasurer`` has the following requirements:
-
-- The ``PeerDelayMeasurer`` shall transmit PDelayReq frames and capture the hardware transmit timestamp (``t1``)
-- The ``PeerDelayMeasurer`` shall receive PDelayResp (providing ``t2``, ``t4``) and PDelayRespFollowUp (providing ``t3c``) messages
-- The ``PeerDelayMeasurer`` shall compute the peer delay using the IEEE 802.1AS formula: ``path_delay = ((t2 - t1) + (t4 - t3c)) / 2``
-- The ``PeerDelayMeasurer`` shall discard PDelayResp and PDelayRespFollowUp messages whose sequence ID does not match the most recently transmitted PDelayReq
-- The ``PeerDelayMeasurer`` shall suppress the path-delay result when more than one PDelayResp is received for a single PDelayReq (detection of non-time-aware bridges per IEEE 802.1AS)
-- The ``PeerDelayMeasurer`` shall provide thread-safe access to the ``PDelayResult`` via a mutex, as ``SendRequest()`` runs on the PdelayThread while response handlers are called from the RxThread
-
-PhcAdjuster Unit
-~~~~~~~~~~~~~~~~
-
-The ``PhcAdjuster`` component synchronizes the PTP Hardware Clock (PHC) on the NIC. It applies step corrections for large offsets and frequency slew for smooth convergence of small offsets.
-
-Implementation Requirements
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-The ``PhcAdjuster`` has the following requirements:
-
-- The ``PhcAdjuster`` shall apply an immediate time step correction for offsets exceeding ``step_threshold_ns``
-- The ``PhcAdjuster`` shall apply frequency slew (in ppb) for offsets below the step threshold
-- The ``PhcAdjuster`` shall support platform-specific implementations: ``clock_adjtime()`` on Linux, EMAC PTP ioctls on QNX
-- The ``PhcAdjuster`` shall be configurable via ``PhcConfig`` (device path, step threshold, enable/disable flag)
+The ``PhcAdjuster`` unit synchronizes the PTP Hardware Clock (PHC) on the NIC. It applies step corrections for large offsets and frequency slew for smooth convergence of small offsets.
 
 Fallback Behavior When PHC Is Unavailable
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -409,137 +292,31 @@ The ``PhcAdjuster`` degrades gracefully in two scenarios:
 
 2. **PHC enabled but device inaccessible** (e.g., ``/dev/ptp0`` does not exist on Linux, or the EMAC interface name is wrong on QNX):
 
-   - **Linux**: the constructor calls ``open(device, O_RDWR)``; on failure ``phc_fd_`` stays at ``-1``. Both ``AdjustOffset()`` and ``AdjustFrequency()`` guard against ``phc_fd_ < 0`` and return immediately — a true silent skip with no system call.
+   - **Linux**: the constructor calls ``open(device, O_RDWR)``; on failure ``phc_fd_`` stays at ``-1``. Both ``AdjustOffset()`` and ``AdjustFrequency()`` guard against ``phc_fd_ < 0`` and return immediately -- a true silent skip with no system call.
 
-   - **QNX**: ``qnx_phc_open()`` always returns ``0`` and never fails — it only stores the device name in a thread-local context. There is no ``phc_fd_ < 0`` guard. The adjustment methods always call ``qnx_phc_adjtime_step()`` / ``qnx_phc_adjfreq_ppb()``, which internally create a UDP socket and issue ``SIOCGDRVSPEC`` / ``SIOCSDRVSPEC`` ioctls. If the socket or ioctl fails (e.g., wrong interface name, unsupported hardware), the function returns ``-1``, but the caller discards it with a ``(void)`` cast. There is no explicit skip — the call is always attempted and errors are silently absorbed.
+   - **QNX**: ``qnx_phc_open()`` always returns ``0`` and never fails -- it only stores the device name in a thread-local context. There is no ``phc_fd_ < 0`` guard. The adjustment methods always call ``qnx_phc_adjtime_step()`` / ``qnx_phc_adjfreq_ppb()``, which internally create a UDP socket and issue ``SIOCGDRVSPEC`` / ``SIOCSDRVSPEC`` ioctls. If the socket or ioctl fails (e.g., wrong interface name, unsupported hardware), the function returns ``-1``, but the caller discards it with a ``(void)`` cast. There is no explicit skip -- the call is always attempted and errors are silently absorbed.
 
-In both scenarios TimeSlave continues to track the master clock and publish accurate ``GptpIpcData`` snapshots (including offset and status flags) to shared memory. The downstream TimeDaemon and any applications consuming time are unaffected — only the NIC hardware clock itself will drift relative to PTP time.
+In both scenarios TimeSlave continues to track the master clock and publish accurate ``GptpIpcData`` snapshots (including offset and status flags) to shared memory. The downstream TimeDaemon and any applications consuming time are unaffected -- only the NIC hardware clock itself will drift relative to PTP time.
 
 Platform Support
 ~~~~~~~~~~~~~~~~
 
-TimeSlave supports two target platforms with platform-specific implementations selected at compile time via Bazel ``select()``:
+TimeSlave supports two target platforms with platform-specific implementations selected at compile time via Bazel ``select()``. The ``RawSocket`` and ``NetworkIdentity`` interfaces provide the abstraction boundary.
 
-.. list-table:: Platform Implementations
-   :header-rows: 1
-   :widths: 25 37 38
+See ``gptp_engine.h`` and ``raw_socket.h`` for hardware timestamping mechanisms (``AF_PACKET``/BPF), ``phc_adjuster.h`` for PHC adjustment APIs (``clock_adjtime`` vs QNX ioctls), and ``network_identity.h`` for MAC address retrieval methods.
 
-   * - Component
-     - Linux
-     - QNX
-   * - Raw Socket
-     - ``AF_PACKET`` + ``SO_TIMESTAMPING``; HW RX timestamp via ``recvmsg`` ``SCM_TIMESTAMPING``
-     - BPF (``/dev/bpf``); HW RX timestamp via ``bpf_xhdr.bh_tstamp`` (``BIOCSTSTAMP BPF_T_BINTIME|BPF_T_PTP``); TX PHC timestamp via dedicated TX loopback fd (``BIOCSSEESENT``), filtered to Pdelay_Req frames only (BPF message-type 0x02); single static context (not thread-local)
-   * - Network Identity
-     - ``ioctl(SIOCGIFHWADDR)`` → EUI-48 → EUI-64
-     - ``getifaddrs()`` + ``AF_LINK`` / ``sockaddr_dl`` (``LLADDR``) → EUI-48/64
-   * - PHC Adjuster
-     - ``clock_adjtime()`` (``SYS_clock_adjtime`` syscall); step via ``ADJ_SETOFFSET|ADJ_NANO``; slew via ``ADJ_FREQUENCY`` (scaled-ppm)
-     - ``SIOCGDRVSPEC`` / ``SIOCSDRVSPEC`` on UDP socket; step via ``PTP_GET_TIME`` (0x102) + ``PTP_SET_TIME`` (0x103); slew via ``EMAC_PTP_ADJ_FREQ_PPM`` (0x200) in ppm
-   * - HighPrecisionLocalSteadyClock
-     - ``CLOCK_MONOTONIC`` via ``clock_gettime()``
-     - QNX ``ClockCycles()`` CPU instruction (reads hardware performance counter directly, equivalent to ``RDTSC`` on x86 / ``CNTVCT`` on ARM64), converted to nanoseconds via cycles-per-second calibration. Used instead of ``clock_gettime()`` because QNX ``CLOCK_MONOTONIC`` resolution is limited to microsecond level, whereas ``ClockCycles()`` provides nanosecond-level precision with no syscall overhead.
-
-The ``RawSocket`` and ``NetworkIdentity`` interfaces provide the abstraction boundary. Platform-specific source files are organized under ``score/time_slave/src/gptp/platform/linux/`` and ``score/time_slave/src/gptp/platform/qnx/``.
+Platform-specific source files are organized under ``score/time_slave/src/gptp/platform/linux/`` and ``score/time_slave/src/gptp/platform/qnx/``.
 
 Instrumentation
 ~~~~~~~~~~~~~~~
 
-ProbeManager
-^^^^^^^^^^^^
+TimeSlave provides two runtime instrumentation mechanisms for development and debugging:
 
-The ``ProbeManager`` is a singleton that traces probe events at key processing points in the gPTP engine. It emits a ``LogDebug`` entry on every ``Trace()`` call and forwards the event to a linked ``Recorder`` (if set and enabled). Probing is controlled at runtime via ``SetEnabled()``; the ``GPTP_PROBE()`` macro provides zero overhead when disabled.
+- **ProbeManager** — singleton that traces probe events at key processing points (packet RX, Sync/FollowUp processing, peer delay completion, PHC adjustments)
+- **Recorder** — thread-safe CSV file writer that appends timestamped event rows to disk
 
-Supported probe points (``ProbePoint`` enum):
-
-.. list-table:: ProbePoint Events
-   :header-rows: 1
-   :widths: 10 30 60
-
-   * - Value
-     - Enumerator
-     - Trigger
-   * - 0
-     - ``kRxPacketReceived``
-     - Raw Ethernet frame received from socket (RxThread)
-   * - 1
-     - ``kSyncFrameParsed``
-     - Sync message successfully decoded by ``GptpMessageParser``
-   * - 2
-     - ``kFollowUpProcessed``
-     - FollowUp received; ``SyncStateMachine::OnFollowUp()`` returned a ``SyncResult``
-   * - 3
-     - ``kOffsetComputed``
-     - Final clock offset value available after Sync/FollowUp correlation
-   * - 4
-     - ``kPdelayReqSent``
-     - PDelayReq frame transmitted by ``PeerDelayMeasurer``
-   * - 5
-     - ``kPdelayCompleted``
-     - Peer delay computation finished (all four timestamps collected)
-   * - 6
-     - ``kPhcAdjusted``
-     - ``PhcAdjuster`` applied a step or frequency correction
-
-When a probe event is forwarded to the ``Recorder``, it is written with ``RecordEvent::kProbe`` and the ``ProbePoint`` value stored in the ``status_flags`` field of the CSV row.
-
-Recorder
-^^^^^^^^
-
-Thread-safe CSV file writer. When enabled, appends one row per event to the configured file. The file is opened in append mode (``ios::app``); a CSV header is written only if the file is newly created (size == 0).
-
-**Status model:** the ``Recorder`` starts in the state determined by ``Config.enabled``. If a write error occurs (``file_.good()`` fails after a flush), ``enabled_`` is atomically set to ``false`` and all subsequent ``Record()`` calls become no-ops. The file is never re-opened after an error.
-
-Configuration (``Recorder::Config``):
-
-.. list-table:: Recorder Configuration
-   :header-rows: 1
-   :widths: 30 15 55
-
-   * - Parameter
-     - Type
-     - Description
-   * - ``enabled``
-     - bool
-     - Enable or disable recording; default: ``false``
-   * - ``file_path``
-     - string
-     - Output CSV file path; default: ``/var/log/gptp_record.csv``
-   * - ``offset_threshold_ns``
-     - int64_t
-     - Reserved for ``kOffsetThreshold`` events (threshold above which offsets are logged); default: ``1 000 000`` (1 ms)
-   * - ``flush_interval``
-     - uint32_t
-     - Number of rows between explicit ``file_.flush()`` calls; default: ``8``
-
-CSV output format::
-
-   mono_ns,event,offset_ns,pdelay_ns,seq_id,status_flags
-
-Supported ``RecordEvent`` values written to the ``event`` column:
-
-.. list-table:: RecordEvent Values
-   :header-rows: 1
-   :widths: 10 30 60
-
-   * - Value
-     - Enumerator
-     - Description
-   * - 0
-     - ``kSyncReceived``
-     - A Sync message was received and processed
-   * - 1
-     - ``kPdelayCompleted``
-     - A full peer delay measurement cycle completed
-   * - 2
-     - ``kClockJump``
-     - A forward or backward time jump was detected
-   * - 3
-     - ``kOffsetThreshold``
-     - Clock offset exceeded ``offset_threshold_ns``
-   * - 4
-     - ``kProbe``
-     - Forwarded from ``ProbeManager::Trace()``; ``status_flags`` column carries the ``ProbePoint`` value
+See ``probe.h`` for ProbePoint enumeration and zero-overhead ``GPTP_PROBE()`` macro.
+See ``recorder.h`` for CSV format, RecordEvent types, Recorder::Config parameters, and error-handling behavior.
 
 Logging configuration
 ~~~~~~~~~~~~~~~~~~~~~

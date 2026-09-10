@@ -25,30 +25,47 @@ namespace ts
 namespace details
 {
 
-/// Interface for a platform raw socket used by GptpEngine and PeerDelayMeasurer.
+/// @brief Platform-agnostic raw socket interface used by @c GptpEngine and
+/// @c PeerDelayMeasurer for gPTP frame transmission and reception.
+///
+/// Provides hardware timestamping support with automatic fallback to software
+/// timestamps when the NIC does not support hardware timestamping.
 class RawSocket
 {
   public:
     virtual ~RawSocket() noexcept = default;
 
-    /// Open the socket bound to @p iface. Returns false on failure.
+    /// @brief Open the socket bound to @p iface.
+    ///
+    /// @return false on failure.
     virtual bool Open(const std::string& iface) = 0;
 
-    /// Configure hardware TX/RX timestamping. Returns false on failure.
+    /// @brief Configures hardware TX/RX timestamping on the NIC if supported.
+    ///
+    /// @return false on failure or if hardware timestamping is unsupported.
     virtual bool EnableHwTimestamping() = 0;
 
-    /// Close the socket and release the file descriptor.
+    /// @brief Close the socket and release the file descriptor.
     virtual void Close() = 0;
 
-    /// Receive one frame.
+    /// @brief Receive one Ethernet frame with its hardware (or software fallback) timestamp.
+    ///
+    /// @param buf        Buffer for the received frame.
+    /// @param buf_len    Buffer length in bytes.
+    /// @param hwts       Output: hardware timestamp if available, otherwise software timestamp.
+    /// @param timeout_ms Receive timeout in milliseconds (0 = non-blocking).
     /// @return Number of bytes received, 0 on timeout, -1 on error.
     virtual int Recv(std::uint8_t* buf, std::size_t buf_len, ::timespec& hwts, int timeout_ms) = 0;
 
-    /// Send one frame.
+    /// @brief Send one Ethernet frame and capture its hardware transmit timestamp.
+    ///
+    /// @param buf  Frame buffer.
+    /// @param len  Frame length in bytes.
+    /// @param hwts Output: hardware transmit timestamp if available, otherwise software timestamp.
     /// @return Number of bytes sent, or -1 on error.
     virtual int Send(const void* buf, int len, ::timespec& hwts) = 0;
 
-    /// Return the underlying file descriptor.
+    /// @brief Return the underlying file descriptor (for use with @c select / @c poll).
     virtual int GetFd() const = 0;
 };
 

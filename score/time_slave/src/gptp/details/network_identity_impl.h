@@ -35,11 +35,11 @@ namespace details
 class NetworkIdentityImpl : public NetworkIdentity
 {
   public:
-    /// Resolve the ClockIdentity for @p iface_name.
+    /// @brief Resolve the ClockIdentity for @p iface_name.
     /// @return true on success.
     bool Resolve(const std::string& iface_name) override;
 
-    /// Return the resolved identity.  Valid only after a successful Resolve().
+    /// @brief Return the resolved identity.  Valid only after a successful Resolve().
     ClockIdentity GetClockIdentity() const override
     {
         return identity_;

@@ -25,19 +25,19 @@ namespace ts
 namespace details
 {
 
-/// Measurement probe points within the gPTP pipeline.
+/// @brief Measurement probe points within the gPTP pipeline.
 enum class ProbePoint : std::uint8_t
 {
-    kRxPacketReceived = 0,
-    kSyncFrameParsed = 1,
-    kFollowUpProcessed = 2,
-    kOffsetComputed = 3,
-    kPdelayReqSent = 4,
-    kPdelayCompleted = 5,
-    kPhcAdjusted = 6,
+    kRxPacketReceived = 0,   ///< Raw Ethernet frame received from socket (RxThread).
+    kSyncFrameParsed = 1,    ///< Sync message successfully decoded by GptpMessageParser.
+    kFollowUpProcessed = 2,  ///< FollowUp received; SyncStateMachine::OnFollowUp() returned a SyncResult.
+    kOffsetComputed = 3,     ///< Final clock offset value available after Sync/FollowUp correlation.
+    kPdelayReqSent = 4,      ///< PDelayReq frame transmitted by PeerDelayMeasurer.
+    kPdelayCompleted = 5,    ///< Peer delay computation finished (all four timestamps collected).
+    kPhcAdjusted = 6,        ///< PhcAdjuster applied a step or frequency correction.
 };
 
-/// Data payload for a single probe event.
+/// @brief Data payload for a single probe event.
 struct ProbeData
 {
     std::int64_t ts_mono_ns{0};
@@ -45,12 +45,21 @@ struct ProbeData
     std::uint32_t seq_id{0};
 };
 
-/**
- * @brief Singleton manager for runtime measurement probes.
- *
- * When enabled, traces probe events to the logger and optionally to a Recorder.
- * Controlled at runtime via SetEnabled().
- */
+/// @brief Singleton manager for runtime measurement probes in the gPTP pipeline.
+///
+/// When enabled, records probe events at key processing points (packet RX,
+/// Sync/FollowUp processing, peer delay completion, PHC adjustments) to the
+/// logger and optionally to a @c Recorder for CSV output.
+///
+/// Provides zero overhead when disabled: @c IsEnabled() is an atomic load that
+/// causes an early exit in the @c GPTP_PROBE() macro before any argument
+/// evaluation.
+///
+/// Thread-safe: @c enabled_ and @c recorder_ use @c std::atomic; @c Trace()
+/// may be called concurrently from RxThread, PdelayThread, and main thread.
+///
+/// @see ProbePoint Enumeration of instrumentation points.
+/// @see GPTP_PROBE Convenience macro for zero-overhead instrumented calls.
 class ProbeManager final
 {
   public:
@@ -65,13 +74,18 @@ class ProbeManager final
         return enabled_.load(std::memory_order_acquire);
     }
 
-    /// Optional: link to a Recorder for persistent probe output.
+    /// @brief Optional: link to a @c Recorder for persistent CSV probe output.
+    /// Pass @c nullptr to unlink.
     void SetRecorder(Recorder* recorder)
     {
         recorder_.store(recorder, std::memory_order_release);
     }
 
-    /// Record a probe event. Thread-safe.
+    /// @brief Records a probe event. Thread-safe.
+    ///
+    /// No-op if @c IsEnabled() returns @c false (fast atomic-load check).
+    /// When enabled, logs the event via the middleware logger and, if a
+    /// @c Recorder is linked, forwards the event for CSV file output.
     void Trace(ProbePoint point, const ProbeData& data);
 
   private:
@@ -80,7 +94,7 @@ class ProbeManager final
     std::atomic<Recorder*> recorder_{nullptr};
 };
 
-/// Returns the current monotonic timestamp in nanoseconds.
+/// @brief Returns the current monotonic timestamp in nanoseconds (@c CLOCK_MONOTONIC).
 std::int64_t ProbeMonoNs() noexcept;
 
 }  // namespace details

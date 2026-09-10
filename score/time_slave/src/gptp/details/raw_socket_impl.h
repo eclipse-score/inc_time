@@ -33,8 +33,9 @@ namespace details
 /**
  * @brief Platform raw socket for Ethernet I/O with hardware timestamping.
  *
- * On Linux uses AF_PACKET / SO_TIMESTAMPING.
- * On QNX uses the QNX raw-socket shim.
+ * Implements platform-specific raw socket operations:
+ * - Linux: AF_PACKET with SO_TIMESTAMPING for NIC-level timestamps
+ * - QNX: io-pkt raw-socket shim
  */
 class RawSocketImpl : public RawSocket
 {
@@ -52,6 +53,12 @@ class RawSocketImpl : public RawSocket
     bool Open(const std::string& iface) override;
 
     /// Configure hardware TX/RX timestamping on the already-opened socket.
+    ///
+    /// On Linux, requests SO_TIMESTAMPING (NIC-level timestamps). If the NIC
+    /// does not support hardware timestamping, returns false and logs a warning.
+    /// The socket continues to work, populating hwts with software timestamps
+    /// (higher jitter but protocol correctness is unaffected).
+    ///
     /// Returns false on failure. A no-op on platforms that don't support it.
     bool EnableHwTimestamping() override;
 

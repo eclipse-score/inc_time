@@ -38,38 +38,56 @@ struct SyncResult
     bool is_time_jump_past{false};
 };
 
-/**
- * @brief Two-step Sync / Follow_Up correlation state machine
- *        (IEEE 802.1AS slave port).
- *
- * Detects forward time jumps (> @p jump_future_threshold_ns) and backward
- * jumps.  Computes neighborRateRatio from successive Sync intervals.
- * Does NOT adjust any hardware clock; offset computation is purely
- * informational for the upstream consumer.
- *
- * Thread-safety: NOT thread-safe. All calls must come from the same thread
- * (the RxLoop thread in GptpEngine), except IsTimeout() which is atomic.
- */
+/// @brief Two-step Sync / Follow_Up correlation state machine (IEEE 802.1AS slave port).
+///
+/// Correlates Sync and Follow_Up message pairs to compute the clock offset and
+/// detect time jumps. Does @b not adjust any hardware clock; offset computation
+/// is purely informational for the upstream consumer.
+///
+/// Internal states:
+///   - @c kEmpty         No Sync has been received yet.
+///   - @c kSyncReceived  Sync received, waiting for a matching Follow_Up.
+///   - @c kPaired        Sync+Follow_Up paired successfully.
+///
+/// Computes @c neighborRateRatio from successive Sync intervals per IEEE 802.1AS:
+///   neighborRateRatio = (Sync[n].rx_ns − Sync[n−1].rx_ns) / (Sync[n].origin_ns − Sync[n−1].origin_ns)
+/// Initialised to 1.0 until the first pair.
+///
+/// Thread-safety: NOT thread-safe. All calls must come from the same thread
+/// (the RxLoop thread in GptpEngine), except @c IsTimeout() which uses
+/// @c std::atomic and may be called from any thread.
 class SyncStateMachine final
 {
   public:
-    /// @param jump_future_threshold_ns  Offset delta above which the state is
-    ///        flagged as a future time jump.  Set to 0 to disable detection.
+    /// @brief Constructs a SyncStateMachine.
+    ///
+    /// @param jump_future_threshold_ns  Offset delta above which state is flagged as forward time jump (ns).
     explicit SyncStateMachine(std::int64_t jump_future_threshold_ns = 500'000'000LL) noexcept;
 
-    /// Called when a Sync message is received (with its HW receive timestamp
-    /// already stored in @p msg.recvHardwareTS).
+    /// @brief Called when a Sync message is received.
+    ///
+    /// Stores the Sync message (with its HW receive timestamp already in
+    /// @c msg.recvHardwareTS) and transitions state @c kEmpty \u2192 @c kSyncReceived.
     void OnSync(const PTPMessage& msg);
 
-    /// Called when a FollowUp message is received.
-    /// @return A SyncResult on a successful Sync+FUP pairing, std::nullopt otherwise.
+    /// @brief Called when a FollowUp message is received.
+    ///
+    /// If the sequence ID matches the pending Sync, computes the clock offset
+    /// (local hw_ts minus master_ns), detects time jumps (forward:
+    /// abs(offset_ns minus prev_offset_ns) greater than threshold; backward: master_ns less than prev_master_ns),
+    /// updates @c neighborRateRatio, and transitions to @c kPaired.
+    ///
+    /// @return A @c SyncResult on successful Sync+FUP pairing; @c std::nullopt on sequence mismatch.
     std::optional<SyncResult> OnFollowUp(const PTPMessage& msg);
 
-    /// @return true if no valid Sync+FUP has been received for longer than
-    ///         @p timeout_ns nanoseconds (monotonic).
+    /// @brief Returns @c true if no valid Sync+FUP has been received for longer
+    /// than @p timeout_ns nanoseconds (monotonic clock).
+    ///
+    /// Thread-safe: may be called from the main thread while the RxThread
+    /// processes messages.
     bool IsTimeout(std::int64_t mono_now_ns, std::int64_t timeout_ns) const;
 
-    /// @return The latest computed neighborRateRatio (1.0 until first pair).
+    /// @brief Returns the latest computed neighborRateRatio (1.0 until the first pair).
     double GetNeighborRateRatio() const
     {
         return neighbor_rate_ratio_;
@@ -92,7 +110,6 @@ class SyncStateMachine final
     std::atomic<std::int64_t> last_sync_mono_ns_{0};
     std::atomic<std::int64_t> created_mono_ns_;
 };
-
 }  // namespace details
 }  // namespace ts
 }  // namespace score

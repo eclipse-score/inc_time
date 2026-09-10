@@ -40,27 +40,40 @@ namespace details
 {
 
 // ─── EtherType constants ────────────────────────────────────────────────────
+/// IEEE 1588 PTP EtherType.
 constexpr std::uint16_t kEthP1588 = 0x88F7U;
+/// IEEE 802.1Q VLAN tag EtherType.
 constexpr std::uint16_t kEthP8021Q = 0x8100U;
 
 // ─── MAC / buffer sizes ─────────────────────────────────────────────────────
+/// Ethernet MAC address length in bytes.
 constexpr std::size_t kMacAddrLen = 6U;
+/// 802.1Q VLAN tag length in bytes.
 constexpr std::size_t kVlanTagLen = 4U;
 
 // ─── PTP message-type codes ─────────────────────────────────────────────────
+/// PTP message type: Sync.
 constexpr std::uint8_t kPtpMsgtypeSync = 0x0;
+/// PTP message type: Pdelay_Req.
 constexpr std::uint8_t kPtpMsgtypePdelayReq = 0x2;
+/// PTP message type: Pdelay_Resp.
 constexpr std::uint8_t kPtpMsgtypePdelayResp = 0x3;
+/// PTP message type: Follow_Up.
 constexpr std::uint8_t kPtpMsgtypeFollowUp = 0x8;
+/// PTP message type: Pdelay_Resp_Follow_Up.
 constexpr std::uint8_t kPtpMsgtypePdelayRespFollowUp = 0xA;
 
 // ─── PTP header constants ────────────────────────────────────────────────────
+/// IEEE 802.1AS transport-specific value (upper nibble of first header byte).
 constexpr std::uint8_t kPtpTransportSpecific = (1U << 4U);
+/// PTP protocol version (2 for IEEE 1588-2008 / 802.1AS).
 constexpr std::uint8_t kPtpVersion = 2U;
 
+/// Nanoseconds per second.
 constexpr std::int64_t kNsPerSec = 1'000'000'000LL;
 
 // ─── Control field ───────────────────────────────────────────────────────────
+/// PTP control field values (IEEE 1588-2008 §13.3.2.10).
 enum class ControlField : std::uint8_t
 {
     kSync = 0,
@@ -72,6 +85,7 @@ enum class ControlField : std::uint8_t
 };
 
 // ─── State machine states ────────────────────────────────────────────────────
+/// Internal states for the Sync/Follow_Up correlation state machine.
 enum class SyncState : std::uint8_t
 {
     kEmpty,
@@ -80,23 +94,27 @@ enum class SyncState : std::uint8_t
 };
 
 // ─── Time value type ─────────────────────────────────────────────────────────
+/// Time value in nanoseconds (internal representation).
 struct TmvT
 {
     std::int64_t ns{0};
 };
 
 // ─── PTP wire structures (all SCORE_TS_PACKED) ───────────────────────────────
+/// IEEE 1588 ClockIdentity (8-byte EUI-64).
 struct SCORE_TS_PACKED ClockIdentity
 {
     std::uint8_t id[8]{};
 };
 
+/// IEEE 1588 PortIdentity (ClockIdentity + port number).
 struct SCORE_TS_PACKED PortIdentity
 {
     ClockIdentity clockIdentity;
     std::uint16_t portNumber{0};
 };
 
+/// IEEE 1588 Timestamp (48-bit seconds + 32-bit nanoseconds).
 struct SCORE_TS_PACKED Timestamp
 {
     std::uint16_t seconds_msb{0};
@@ -104,6 +122,7 @@ struct SCORE_TS_PACKED Timestamp
     std::uint32_t nanoseconds{0};
 };
 
+/// IEEE 1588 PTP message header (common to all message types).
 struct SCORE_TS_PACKED PTPHeader
 {
     std::uint8_t tsmt{0};
@@ -120,18 +139,21 @@ struct SCORE_TS_PACKED PTPHeader
     std::int8_t logMessageInterval{0};
 };
 
+/// Sync message body.
 struct SCORE_TS_PACKED SyncBody
 {
     PTPHeader ptpHdr{};
     Timestamp originTimestamp{};
 };
 
+/// Follow_Up message body.
 struct SCORE_TS_PACKED FollowUpBody
 {
     PTPHeader ptpHdr{};
     Timestamp preciseOriginTimestamp{};
 };
 
+/// Pdelay_Req message body.
 struct SCORE_TS_PACKED PdelayReqBody
 {
     PTPHeader ptpHdr{};
@@ -139,13 +161,15 @@ struct SCORE_TS_PACKED PdelayReqBody
     PortIdentity reserved{};
 };
 
+/// Pdelay_Resp message body.
 struct SCORE_TS_PACKED PdelayRespBody
 {
     PTPHeader ptpHdr{};
-    Timestamp requestReceiptTimestamp{};  ///< IEEE 802.1AS: t₂ — time the remote peer received our PdelayReq
+    Timestamp requestReceiptTimestamp{};  ///< IEEE 802.1AS: t₂ — time the remote peer received our PdelayReq.
     PortIdentity requestingPortIdentity{};
 };
 
+/// Pdelay_Resp_Follow_Up message body.
 struct SCORE_TS_PACKED PdelayRespFollowUpBody
 {
     PTPHeader ptpHdr{};
@@ -153,13 +177,16 @@ struct SCORE_TS_PACKED PdelayRespFollowUpBody
     PortIdentity requestingPortIdentity{};
 };
 
+/// Raw message buffer (maximum Ethernet payload).
 struct SCORE_TS_PACKED RawMessageData
 {
     std::uint8_t buffer[1500]{};
 };
 
+/// Parsed PTP message with metadata.
 struct PTPMessage
 {
+    /// Union of all PTP message types.
     union SCORE_TS_PACKED
     {
         PTPHeader ptpHdr;
@@ -181,6 +208,8 @@ struct PTPMessage
 static_assert(sizeof(PTPMessage) <= 1600, "PTPMessage too large");
 
 // ─── Timestamp conversion helpers ────────────────────────────────────────────
+/// @brief Convert PTP wire Timestamp to internal TmvT (nanoseconds since epoch).
+/// @return TmvT with zero ns on overflow.
 inline TmvT TimestampToTmv(const Timestamp& ts) noexcept
 {
     const std::uint64_t sec =
@@ -195,6 +224,8 @@ inline TmvT TimestampToTmv(const Timestamp& ts) noexcept
     return TmvT{static_cast<std::int64_t>(total_ns)};
 }
 
+/// @brief Convert internal TmvT to PTP wire Timestamp.
+/// @return Timestamp with all zeros if @p x is negative.
 inline Timestamp TmvToTimestamp(const TmvT& x) noexcept
 {
     if (x.ns < 0)
@@ -208,11 +239,13 @@ inline Timestamp TmvToTimestamp(const TmvT& x) noexcept
     return t;
 }
 
+/// @brief Convert PTP correctionField (scaled nanoseconds, 16.48 fixed-point) to TmvT.
 inline TmvT CorrectionToTmv(std::int64_t corr) noexcept
 {
     return TmvT{corr / 65536LL};
 }
 
+/// @brief Convert ClockIdentity to uint64_t (host byte order).
 inline std::uint64_t ClockIdentityToU64(const ClockIdentity& ci) noexcept
 {
     std::uint64_t v{0};

@@ -26,17 +26,17 @@ namespace ts
 namespace details
 {
 
-/// Event types that can be recorded.
+/// @brief Event types that can be recorded by the @c Recorder.
 enum class RecordEvent : std::uint8_t
 {
-    kSyncReceived = 0,
-    kPdelayCompleted = 1,
-    kClockJump = 2,
-    kOffsetThreshold = 3,
-    kProbe = 4,
+    kSyncReceived = 0,     ///< A Sync message was received and processed.
+    kPdelayCompleted = 1,  ///< A full peer delay measurement cycle completed.
+    kClockJump = 2,        ///< A forward or backward time jump was detected.
+    kOffsetThreshold = 3,  ///< Clock offset exceeded offset_threshold_ns.
+    kProbe = 4,  ///< Forwarded from ProbeManager::Trace(); status_flags column carries the ``ProbePoint`` value.
 };
 
-/// A single record entry written to the log file.
+/// @brief A single record entry written to the CSV log file.
 struct RecordEntry
 {
     std::int64_t mono_ns{0};
@@ -47,21 +47,33 @@ struct RecordEntry
     std::uint8_t status_flags{0};
 };
 
-/**
- * @brief Thread-safe CSV file recorder for gPTP events.
- *
- * When enabled, appends CSV lines to the configured file path.
- * Format: mono_ns,event,offset_ns,pdelay_ns,seq_id,status_flags
- */
+/// @brief Thread-safe CSV file recorder for gPTP events and diagnostics.
+///
+/// When enabled, appends one CSV row per event to the configured file path.
+/// The file is opened in append mode; a header row is written only if the file
+/// is newly created. CSV format:
+/// @code
+///   mono_ns,event,offset_ns,pdelay_ns,seq_id,status_flags
+///   1234567890,0,1500,250000,42,3
+/// @endcode
+///
+/// On write or flush failure, @c enabled_ is set to @c false atomically.
+/// Failures are non-recoverable; subsequent @c Record() calls are no-ops.
+/// The file is never re-opened after an error.
+///
+/// @see RecordEvent Enumeration of recordable event types.
+/// @see RecordEntry Single CSV row data structure.
 class Recorder final
 {
   public:
+    /// @brief Configuration parameters for the @c Recorder.
     struct Config
     {
-        bool enabled = false;
-        std::string file_path = "/var/log/gptp_record.csv";
-        std::int64_t offset_threshold_ns = 1'000'000LL;  ///< 1 ms
-        std::uint32_t flush_interval = 8U;
+        bool enabled = false;                                ///< Enable or disable recording.
+        std::string file_path = "/var/log/gptp_record.csv";  ///< Output CSV file path.
+        std::int64_t offset_threshold_ns =
+            1'000'000LL;  ///< Reserved for ``kOffsetThreshold`` events (threshold above which offsets are logged); 1ms.
+        std::uint32_t flush_interval = 8U;  ///< Number of rows between explicit ``file_.flush()`` calls.
     };
 
     explicit Recorder(Config cfg);
@@ -75,7 +87,13 @@ class Recorder final
         return enabled_.load(std::memory_order_relaxed) && file_.is_open();
     }
 
-    /// Record an entry. Thread-safe.
+    /// @brief Records an entry to the CSV file. Thread-safe.
+    ///
+    /// Serialises writes via @c mutex_. Appends one CSV line in the format
+    /// @c mono_ns,event,offset_ns,pdelay_ns,seq_id,status_flags.
+    /// Every @c Config::flush_interval rows, calls @c std::ofstream::flush().
+    /// On write or flush failure sets @c enabled_ to @c false; later calls
+    /// become no-ops.
     void Record(const RecordEntry& entry);
 
   private:

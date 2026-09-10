@@ -25,6 +25,19 @@ namespace ts
 namespace details
 {
 
+/// @brief Returns current @c CLOCK_MONOTONIC time in nanoseconds.
+///
+/// @details
+/// `CLOCK_MONOTONIC` is a non-decreasing system uptime-style clock and is not
+/// tied to wall-clock time.
+/// - Linux: starts at an unspecified point (typically boot) and is not affected
+///   by manual/NTP wall-clock adjustments; it may still be slightly slewed.
+/// - QNX/POSIX systems: monotonic clock with an unspecified epoch, intended for
+///   interval measurement and not affected by wall-clock set operations.
+///
+/// Use this value only for elapsed-time calculations, not for calendar time.
+///
+/// @return Nanoseconds since an unspecified epoch, or 0 on failure.
 inline std::int64_t MonoNs() noexcept
 {
     ::timespec ts{};

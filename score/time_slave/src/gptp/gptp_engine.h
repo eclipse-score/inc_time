@@ -38,7 +38,9 @@ namespace ts
 namespace details
 {
 
-/// Configuration for GptpEngine.
+/// @brief All configurable parameters for the gPTP engine.
+///
+/// Platform-specific defaults apply for QNX (@c emac0) and Linux (@c /dev/ptp0).
 struct GptpEngineOptions
 {
     std::string iface_name = "emac0";                       ///< Network interface for gPTP
@@ -50,20 +52,33 @@ struct GptpEngineOptions
     std::uint8_t domain_number = 0U;                        ///< gPTP domain number (0–127)
 };
 
-/**
- * @brief gPTP engine for the TimeSlave process.
- *
- * Runs two POSIX threads: RxThread (receive/parse PTP frames) and
- * PdelayThread (periodic Pdelay_Req transmission).
- *
- * Dual-snapshot design:
- *  - pending_snapshot_: filled by the RxThread on every Sync+FollowUp
- *  - current_snapshot_: a committed, fully-flagged snapshot
- *
- * Callers should:
- *  1. Call FinalizeSnapshot() to check timeout and commit pending to current.
- *  2. Call ReadPTPSnapshot() (const) to retrieve the current snapshot.
- */
+/// @brief Core gPTP protocol engine for the TimeSlave process.
+///
+/// Manages two background threads for network I/O and peer delay measurement,
+/// exposing thread-safe @c ReadPTPSnapshot() for the main thread.
+///
+/// @b RxThread responsibilities:
+///   1. Receive raw gPTP Ethernet frames with hardware timestamps from the NIC via raw sockets.
+///   2. Decode and parse PTP messages (Sync, FollowUp, PdelayResp, PdelayRespFollowUp, PdelayReq).
+///   3a. Correlate Sync/FollowUp pairs and compute the clock offset and neighborRateRatio. Update @c pending_snapshot_ under @c snapshot_mutex_ protection.
+///   3b. Correlate PdelayResp/PdelayRespFollowUp pairs and sent PdelayReq using the PeerDelayMeasurer unit and compute the propagation delay as defined in the IEEE 802.1AS standard.
+///   3c. React on incoming PdelayReq by sending PdelayResp and PdelayRespFollowUp
+///
+/// @b PdelayThread responsibilities:
+///   1. Delay sending the first PdelayReq by the configured pdelay_warmup timespan.
+///   2. Periodically trigger the PeerDelayMeasurer unit to send PdelayReq frames and capture hardware transmit timestamps.
+///
+/// @b Dual-snapshot design:
+///   - @c pending_snapshot_: filled by the RxThread on every Sync+FollowUp.
+///   - @c current_snapshot_: committed snapshot, advanced by @c FinalizeSnapshot().
+///
+/// @c FinalizeSnapshot() must be called regularly (typically main loop); missing calls delay commits.
+///
+/// @c PeerDelayMeasurer uses its own @c std::mutex for PdelayThread / RxThread
+/// synchronisation. @c SyncStateMachine uses @c std::atomic for its timeout flag.
+///
+/// A test constructor accepts injected @c RawSocket and @c NetworkIdentity
+/// dependencies for white-box unit testing without PTP hardware.
 class GptpEngine final
 {
   public:
@@ -81,21 +96,34 @@ class GptpEngine final
     GptpEngine(GptpEngine&&) = delete;
     GptpEngine& operator=(GptpEngine&&) = delete;
 
-    /// Open the raw socket, enable HW timestamping, resolve the ClockIdentity,
-    /// and start the Rx and Pdelay background threads.
+    /// @brief Opens the raw socket, enables hardware timestamping, resolves the
+    /// @c ClockIdentity, and starts the Rx and PDelay background threads.
+    ///
+    /// Calls @c RawSocket::EnableHwTimestamping() to request NIC-level receive
+    /// timestamps (@c SO_TIMESTAMPING on Linux). If the NIC does not support
+    /// hardware timestamping, the call returns @c false and a warning is logged;
+    /// the engine continues normally with software timestamps (higher jitter but
+    /// protocol correctness is unaffected).
+    ///
     /// @return true on success.
     bool Initialize();
 
-    /// Stop background threads and close the socket.
+    /// @brief Stops background threads and closes the socket.
+    ///
     /// @return true (always succeeds).
     bool Deinitialize();
 
-    /// Check for sync timeout, apply status flags, and commit pending_snapshot_
-    /// to current_snapshot_.  Must be called periodically before ReadPTPSnapshot().
+    /// @brief Checks the sync timeout, applies status flags, and commits
+    /// @c pending_snapshot_ to @c current_snapshot_ under @c snapshot_mutex_.
+    ///
+    /// Must be called periodically from the main thread before @c ReadPTPSnapshot().
+    /// Atomic copy under @c snapshot_mutex_.
     void FinalizeSnapshot() noexcept;
 
-    /// Copy the latest committed snapshot into @p data.
-    /// Non-blocking; returns false only if the engine is not initialized.
+    /// @brief Copies the latest committed snapshot into @p data under @c snapshot_mutex_.
+    ///
+    /// Non-blocking and thread-safe. Returns @c false only if the engine is not
+    /// initialised.
     bool ReadPTPSnapshot(score::ts::GptpIpcData& data) const noexcept;
 
   private:
