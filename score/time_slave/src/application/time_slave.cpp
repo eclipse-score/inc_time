@@ -83,9 +83,11 @@ std::int32_t TimeSlave::Initialize(const score::mw::lifecycle::ApplicationContex
     // Apply QNX-specific settings via environment variables (read by the QNX
     // raw-socket shim). Pre-existing env vars are never overridden so users can
     // still override at the command line.
-    if (!cfg.qnx.bpf_device_prefix.empty() && std::getenv("SOCK") == nullptr)
+    // NOTE: do not write to SOCK here. On QNX that variable is used by socket
+    // APIs; setting it to a BPF device path can break socket/getifaddrs calls.
+    if (!cfg.qnx.bpf_device_prefix.empty() && std::getenv("QNX_BPF_DEVICE_PREFIX") == nullptr)
     {
-        ::setenv("SOCK", cfg.qnx.bpf_device_prefix.c_str(), 0);
+        ::setenv("QNX_BPF_DEVICE_PREFIX", cfg.qnx.bpf_device_prefix.c_str(), 0);
     }
     if (cfg.qnx.see_sent && std::getenv("QNX_RAW_SEESENT") == nullptr)
     {
