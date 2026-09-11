@@ -1,0 +1,30 @@
+# *******************************************************************************
+# Copyright (c) 2026 Contributors to the Eclipse Foundation
+#
+# See the NOTICE file(s) distributed with this work for additional
+# information regarding copyright ownership.
+#
+# This program and the accompanying materials are made available under the
+# terms of the Apache License Version 2.0 which is available at
+# https://www.apache.org/licenses/LICENSE-2.0
+#
+# SPDX-License-Identifier: Apache-2.0
+# *******************************************************************************
+# Local clang-tidy overrides for the score_time module.
+#
+# The S-CORE baseline from @score_cpp_policies//clang_tidy:.clang-tidy is
+# applied first; settings here are layered on top per clang-tidy's standard
+# merge rules. Only module-specific suppressions belong here — do not remove
+# baseline checks.
+
+# Only analyze headers inside the score/ source tree. Without this,
+# clang-tidy picks up warnings from externally provided headers
+# (e.g. toolchain redacted_dates.h) that we cannot fix.
+HeaderFilterRegex: 'score/'
+
+# Suppress the builtin-macro-redefined diagnostic emitted by the LLVM
+# toolchain's redacted_dates.h (which redefines __DATE__/__TIME__ for
+# deterministic builds). This is injected by the toolchain via -include
+# and is not user code, so suppressing it here is appropriate.
+Checks: >-
+  -clang-diagnostic-builtin-macro-redefined

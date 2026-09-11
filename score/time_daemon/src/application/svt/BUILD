@@ -27,7 +27,9 @@ load("@score_baselibs//score/language/safecpp:toolchain_features.bzl", "COMPILER
             "svt_handler.h",
         ],
         features = COMPILER_WARNING_FEATURES,
-        visibility = ["//score/time_daemon/src/application:__pkg__"],
+        visibility = [
+            "//score/time_daemon/src/application:__pkg__",
+        ],
         deps = [
             "//score/time_daemon/src/application:timebase_handler",
             "//score/time_daemon/src/application/job_runner",

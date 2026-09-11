@@ -1,0 +1,4 @@
+psutil
+pytest-metadata
+pytest-env
+testing-utils @ git+https://github.com/eclipse-score/testing_tools.git@a2f9cded3deb636f5dc800bf7a47131487119721  # v0.3.0
