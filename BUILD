@@ -92,3 +92,24 @@ use_format_targets(languages = [
     "yaml",
     "cpp",
 ])
+
+# Aggregated component-test suite. Component tests exercise a clock facade
+# (Clock<T>) together with a mocked backend, i.e. more than one unit of code
+# but without a real driver. Run with:
+#   bazel test --config=time-x86_64-linux //:component_tests
+test_suite(
+    name = "component_tests",
+    tests = [
+        "//score/time/high_res_steady_time/src:high_res_steady_clock_test",
+        "//score/time/steady_time/src:steady_clock_test",
+        "//score/time/system_time/src:system_clock_test",
+        "//score/time/vehicle_time/src:vehicle_clock_test",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+# Unit tests: every cc_test under //score/... is already tagged "unit",
+# so `bazel test //score/...` is the canonical unit-tests invocation.
+# No aggregate test_suite is needed here — a `test_suite` in a top-level
+# BUILD file cannot use `//score/...` as an element of its `tests`
+# attribute (package wildcards are rejected).

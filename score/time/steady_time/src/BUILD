@@ -14,6 +14,14 @@
 load("@score_baselibs//:bazel/unit_tests.bzl", "cc_unit_test_suites_for_host_and_qnx")
 load("@score_baselibs//score/language/safecpp:toolchain_features.bzl", "COMPILER_WARNING_FEATURES")
 
+# Source files carrying `// # req-Id:` markers, exposed to
+# //score/time:docs_bundle via its code_targets attribute.
+filegroup(
+    name = "requirement_marked_sources",
+    srcs = ["steady_clock.cpp"],
+    visibility = ["//visibility:public"],
+)
+
 cc_library(
     name = "steady_clock",
     srcs = ["steady_clock.cpp"],
@@ -60,6 +68,7 @@ cc_test(
     srcs = ["steady_clock_adapter_test.cpp"],
     features = COMPILER_WARNING_FEATURES,
     tags = [
+        "component",
         "exclusive",
         "unit",
     ],

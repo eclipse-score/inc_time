@@ -44,6 +44,12 @@ class SampleSteadyService
 
 TEST(SteadyClockTest, NowReturnsTimepointSuitableForDurationArithmetic)
 {
+    ::testing::Test::RecordProperty("FullyVerifies", "comp_req__steady_time__snapshot");
+    ::testing::Test::RecordProperty("TestType", "requirements-based");
+    ::testing::Test::RecordProperty("DerivationTechnique", "requirements-analysis");
+    ::testing::Test::RecordProperty("Description",
+                                    "SteadyClock::Now returns a snapshot backed by std::chrono::steady_clock.");
+
     auto mock = std::make_shared<SteadyClockBackendMock>();
     test_utils::ScopedClockOverride<std::chrono::steady_clock> guard{mock};
 

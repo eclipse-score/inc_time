@@ -14,6 +14,14 @@
 load("@score_baselibs//:bazel/unit_tests.bzl", "cc_unit_test_suites_for_host_and_qnx")
 load("@score_baselibs//score/language/safecpp:toolchain_features.bzl", "COMPILER_WARNING_FEATURES")
 
+# Source files carrying `// # req-Id:` markers, exposed to the root
+# docs() macro's scan_code attribute for source-code traceability.
+filegroup(
+    name = "requirement_marked_sources",
+    srcs = ["vehicle_clock.cpp"],
+    visibility = ["//visibility:public"],
+)
+
 cc_library(
     name = "vehicle_clock",
     srcs = ["vehicle_clock.cpp"],
@@ -65,6 +73,7 @@ cc_test(
     srcs = ["vehicle_clock_test.cpp"],
     features = COMPILER_WARNING_FEATURES,
     tags = [
+        "component",
         "exclusive",
         "unit",
     ],

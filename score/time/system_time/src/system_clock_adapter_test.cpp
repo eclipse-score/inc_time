@@ -44,6 +44,12 @@ class SampleSystemService
 
 TEST(SystemClockTest, NowReturnsTimepointSuitableForDurationArithmetic)
 {
+    ::testing::Test::RecordProperty("FullyVerifies", "comp_req__system_time__snapshot");
+    ::testing::Test::RecordProperty("TestType", "requirements-based");
+    ::testing::Test::RecordProperty("DerivationTechnique", "requirements-analysis");
+    ::testing::Test::RecordProperty("Description",
+                                    "SystemClock::Now returns a snapshot backed by std::chrono::system_clock.");
+
     auto mock = std::make_shared<SystemClockBackendMock>();
     test_utils::ScopedClockOverride<std::chrono::system_clock> guard{mock};
 

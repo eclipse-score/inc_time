@@ -41,21 +41,25 @@ std::ostringstream ClockStatus<VehicleTime::StatusFlag>::PrintTo() const
     return oss;
 }
 
+// # req-Id: comp_req__vehicle_time__snapshot
 ClockTraits<VehicleTime>::Snapshot ClockTraits<VehicleTime>::CallNow(const Backend& impl) noexcept
 {
     return impl.Now();
 }
 
+// # req-Id: comp_req__vehicle_time__lifecycle
 bool InitializationHook<VehicleTime>::CallInit(Backend& impl) noexcept
 {
     return impl.Init();
 }
 
+// # req-Id: comp_req__vehicle_time__lifecycle
 bool AvailabilityHook<VehicleTime>::CallIsAvailable(const Backend& impl) noexcept
 {
     return impl.IsAvailable();
 }
 
+// # req-Id: comp_req__vehicle_time__lifecycle
 bool AvailabilityHook<VehicleTime>::CallWaitUntilAvailable(const Backend& impl,
                                                            const score::cpp::stop_token& token,
                                                            std::chrono::steady_clock::time_point until) noexcept

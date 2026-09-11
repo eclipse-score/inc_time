@@ -44,6 +44,7 @@ For a detailed concept and architectural design, please refer to the :doc:`time_
 
    features/index
    module/index
+   quality_pack
 
 
 Project Layout

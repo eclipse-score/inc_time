@@ -18,6 +18,7 @@ namespace score
 namespace time
 {
 
+// # req-Id: comp_req__system_time__snapshot
 ClockTraits<std::chrono::system_clock>::Snapshot ClockTraits<std::chrono::system_clock>::CallNow(
     const Backend& impl) noexcept
 {

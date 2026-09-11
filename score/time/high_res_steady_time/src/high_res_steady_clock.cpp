@@ -18,6 +18,7 @@ namespace score
 namespace time
 {
 
+// # req-Id: comp_req__high_res_steady_time__snapshot
 ClockTraits<HighResSteadyTime>::Snapshot ClockTraits<HighResSteadyTime>::CallNow(const Backend& impl) noexcept
 {
     return impl.Now();

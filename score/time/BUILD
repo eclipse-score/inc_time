@@ -16,6 +16,13 @@ load("@score_docs_as_code//:docs.bzl", "docs_bundle")
 
 docs_bundle(
     name = "docs_bundle",
+    code_targets = [
+        "//score/time/clock/src:requirement_marked_sources",
+        "//score/time/high_res_steady_time/src:requirement_marked_sources",
+        "//score/time/steady_time/src:requirement_marked_sources",
+        "//score/time/system_time/src:requirement_marked_sources",
+        "//score/time/vehicle_time/src:requirement_marked_sources",
+    ],
     source_dir = "docs",
     visibility = ["//visibility:public"],
 )
