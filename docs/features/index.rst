@@ -19,4 +19,5 @@ Features
    :maxdepth: 2
    :caption: Features:
 
+   architecture/index
    test_cases

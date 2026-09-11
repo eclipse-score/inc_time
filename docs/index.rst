@@ -12,10 +12,10 @@
    # SPDX-License-Identifier: Apache-2.0
    # *******************************************************************************
 
-time_daemon Documentation
-=========================
+S-CORE Time
+===========
 
-This documentation describes the **time_daemon** and the **score::time** module.
+This documentation covers the **score::time** feature and module.
 
 .. contents:: Table of Contents
    :depth: 2
@@ -24,19 +24,17 @@ This documentation describes the **time_daemon** and the **score::time** module.
 Overview
 --------
 
-**time_daemon** is a non-AUTOSAR adaptive process designed to provide synchronized vehicle time to client applications.
-It supports multiple time bases including **in-vehicle synchronized time** (PTP - Precision Time Protocol) and
-**external synchronized time** (absolute time base). The daemon retrieves time information from the respective time sources,
-verifies and validates the timepoints, and distributes this time information across multiple clients through efficient IPC mechanisms.
+**score::time** provides applications with a uniform API for reading time across
+several distinct clock domains: vehicle-synchronized time (PTP), local monotonic
+time, and absolute time. The feature architecture is described in
+:doc:`features/architecture/index`.
 
-The main responsibilities of time_daemon include:
+The module consists of the following components:
 
-- **Providing current Vehicle time** to different applications
-- **Setting synchronization qualifiers** (e.g., Synchronized, Timeout, etc.)
-- **Providing diagnostic information** for system monitoring
-- **Supporting additional verification mechanisms** such as QualifiedVehicleTime (QVT) for safety-critical applications
-
-For a detailed concept and architectural design, please refer to the :doc:`time_daemon documentation <time_daemon/index>`.
+- **score::time** — client-facing ``Clock<Tag>`` library
+- **TimeDaemon** — time validation, aggregation and distribution process
+- **TimeSlave** — gPTP slave endpoint process
+- **ts_client** — gPTP shared-memory IPC between TimeSlave and TimeDaemon
 
 .. toctree::
    :maxdepth: 2
@@ -44,6 +42,7 @@ For a detailed concept and architectural design, please refer to the :doc:`time_
 
    features/index
    module/index
+   glossary
 
 
 Project Layout
@@ -56,7 +55,7 @@ This module follows the Eclipse SCORE component structure:
 - `score/time/`: Client-facing time base libraries
 - `score/ts_client/`: Time synchronization client library
 - `examples/`: Usage examples
-- `docs/features/`: Feature-level documentation
+- `docs/features/architecture/`: Time Feature Architecture
 - `.github/workflows/`: CI/CD pipelines
 
 Quick Start

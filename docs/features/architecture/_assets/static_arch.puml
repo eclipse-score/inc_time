@@ -1,0 +1,62 @@
+' *******************************************************************************
+' Copyright (c) 2026 Contributors to the Eclipse Foundation
+'
+' See the NOTICE file(s) distributed with this work for additional
+' information regarding copyright ownership.
+'
+' This program and the accompanying materials are made available under the
+' terms of the Apache License Version 2.0 which is available at
+' https://www.apache.org/licenses/LICENSE-2.0
+'
+' SPDX-License-Identifier: Apache-2.0
+' *******************************************************************************
+
+@startuml
+
+title Time feature static architecture
+
+legend top left
+| <#LightCoral>  | external time source |
+| <#LightGrey>   | OS / local time base |
+| <#LightBlue>   | score platform stack |
+| <#LightGreen>  | score::time feature  |
+| <#LightSalmon> | application          |
+endlegend
+
+rectangle "ECU" #f0f5f5 {
+  actor "Application" as user #LightSalmon
+
+  package "score::time feature" #e6ffe6 {
+    package "score::time\n(clock library)" #d4f7d4 {
+      component "score::time::VehicleClock" as veh_clock_api #LightGreen
+      component "score::time::<Local>Clock\n(Steady|HiRes|System)" as local_clock_api #LightGreen
+      component "score::time::AbsoluteClock" as abs_clock_api #LightGreen
+    }
+    component "ts_client\n(TimeSlave<->TimeDaemon shm IPC)" as time_slave_client #LightGreen
+    component "TimeDaemon\n" as time_daemon #LightGreen
+    component "TimeSlave\n(gPTP slave endpoint)" as time_slave #LightGreen
+  }
+
+  component "score::someip" as score_someip #LightBlue
+  component "OS / local clock" as os #LightGrey
+}
+
+cloud "Vehicle network\n(gPTP / IEEE 802.1AS)" as veh_net #LightCoral
+cloud "Absolute time source\n(e.g. GPS / UTC)" as abs_master #LightCoral
+
+user --> veh_clock_api : read vehicle time
+user --> local_clock_api : read local time
+user --> abs_clock_api : read absolute time
+
+veh_clock_api --> time_daemon : IPC
+abs_clock_api --> time_daemon : IPC
+time_daemon --> time_slave_client : uses
+time_slave_client <-- time_slave : PTP data
+time_slave ..> veh_net : Synchronization via gPTP
+
+time_daemon <-- score_someip : absolute time
+score_someip ..> abs_master : obtains absolute time
+
+local_clock_api ..> os : reads OS clock
+
+@enduml
