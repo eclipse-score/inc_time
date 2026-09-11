@@ -21,9 +21,7 @@ namespace score
 namespace ts
 {
 
-/**
- * @brief IPC-layer status flags transmitted from TimeSlave to TimeDaemon.
- */
+/// @brief IPC-layer status flags transmitted from TimeSlave to TimeDaemon.
 struct GptpIpcStatus
 {
     bool is_synchronized;
@@ -33,6 +31,7 @@ struct GptpIpcStatus
     bool is_correct;
 };
 
+/// @brief Sync/FollowUp snapshot from latest received gPTP sync cycle.
 struct GptpIpcSyncFupData
 {
     std::uint64_t precise_origin_timestamp;
@@ -46,6 +45,7 @@ struct GptpIpcSyncFupData
     std::uint64_t clock_identity;
 };
 
+/// @brief Peer-delay measurement snapshot from latest completed pDelay cycle.
 struct GptpIpcPDelayData
 {
     std::uint64_t request_origin_timestamp;
@@ -62,12 +62,10 @@ struct GptpIpcPDelayData
     std::uint64_t resp_clock_identity;
 };
 
-/**
- * @brief IPC data snapshot written by TimeSlave and read by TimeDaemon.
- *
- * This type is internal to ts_client and intentionally decoupled from
- * score::td::PtpTimeInfo.  Callers are responsible for mapping between the two.
- */
+/// @brief IPC data snapshot written by TimeSlave and read by TimeDaemon.
+///
+/// This type is internal to ts_client and intentionally decoupled from
+/// score::td::PtpTimeInfo.  Callers are responsible for mapping between the two.
 struct GptpIpcData
 {
     std::chrono::nanoseconds ptp_assumed_time;

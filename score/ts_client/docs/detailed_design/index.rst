@@ -67,56 +67,16 @@ Main classes and their relationships:
 
    </div>
 
-Units within Time Sync Client
-------------------------------
+Units within the Component
+--------------------------
 
-GptpIpcPublisher Unit
-~~~~~~~~~~~~~~~~~~~~~
+The relationship between a unit and its parent component is established implicitly
+through the file path. Each component has its own directory, and units residing
+within that directory belong to it. The unit's attributes and behaviour are documented
+in the source code itself.
 
-The ``GptpIpcPublisher`` component creates and manages the POSIX shared memory segment and writes ``GptpIpcData`` using the seqlock protocol.
-
-Implementation Requirements
-'''''''''''''''''''''''''''
-
-The ``GptpIpcPublisher`` has the following requirements:
-
-- The ``GptpIpcPublisher`` shall create a POSIX shared memory segment via ``shm_open()`` with ``O_CREAT`` flag
-- The ``GptpIpcPublisher`` shall map the shared memory region as ``GptpIpcRegion`` aligned to 64 bytes
-- The ``GptpIpcPublisher`` shall initialize the magic number field to ``0x47505450`` ('GPTP')
-- The ``GptpIpcPublisher`` shall write ``GptpIpcData`` using the seqlock protocol:
-
-  1. Increment ``seq`` (becomes odd — signals write in progress)
-  2. Apply a release memory fence
-  3. ``memcpy`` the ``GptpIpcData`` payload
-  4. Store ``seq_confirm = seq + 1``
-  5. Increment ``seq`` (both ``seq`` and ``seq_confirm`` become even — signals write complete)
-
-- The ``GptpIpcPublisher`` shall use the default shared memory name ``/gptp_ptp_info`` unless overridden
-- The ``GptpIpcPublisher`` shall support ``Destroy()`` to unmap and unlink the shared memory segment
-
-GptpIpcReceiver Unit
-~~~~~~~~~~~~~~~~~~~~
-
-The ``GptpIpcReceiver`` component opens the shared memory segment read-only and reads ``GptpIpcData`` with bounded retry on torn reads.
-
-Implementation Requirements
-'''''''''''''''''''''''''''
-
-The ``GptpIpcReceiver`` has the following requirements:
-
-- The ``GptpIpcReceiver`` shall open the POSIX shared memory segment via ``shm_open()`` with ``O_RDONLY`` flag
-- The ``GptpIpcReceiver`` shall map the shared memory region as read-only (``PROT_READ``)
-- The ``GptpIpcReceiver`` shall validate the magic number (``0x47505450``) on ``Init()``
-- The ``GptpIpcReceiver`` shall read ``GptpIpcData`` using the seqlock protocol with up to 20 retries:
-
-  1. Read ``seq1`` with acquire ordering (must be even, otherwise retry)
-  2. ``memcpy`` the ``GptpIpcData`` payload
-  3. Apply an acquire-release fence
-  4. Read ``seq_confirm`` as ``seq2`` and re-read ``seq`` as ``seq3``
-  5. If ``seq1 == seq2 == seq3``, the read is consistent; otherwise retry
-
-- The ``GptpIpcReceiver`` shall return ``std::optional<GptpIpcData>`` (empty if all retries exhausted)
-- The ``GptpIpcReceiver`` shall support ``Close()`` to unmap the shared memory region
+- **GptpIpcPublisher**: Creates and writes to shared memory using seqlock protocol (see ``src/gptp_ipc_publisher.h``)
+- **GptpIpcReceiver**: Reads from shared memory with bounded retry on torn reads (see ``src/gptp_ipc_receiver.h``)
 
 Seqlock Protocol Workflow
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
