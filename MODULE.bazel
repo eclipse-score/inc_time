@@ -78,7 +78,7 @@ git_override(
     remote = "https://github.com/eclipse-score/score_cpp_policies.git",
 )
 
-bazel_dep(name = "score_platform", version = "0.7.1", dev_dependency = True)
+bazel_dep(name = "score_platform", version = "0.7.2", dev_dependency = True)
 bazel_dep(name = "score_process_description", version = "2.1.2", dev_dependency = True)
 bazel_dep(name = "score_tooling", version = "2.2.1", dev_dependency = True)
 
