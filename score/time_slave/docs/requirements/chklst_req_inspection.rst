@@ -16,20 +16,11 @@
 .. document:: Time Slave Requirements Inspection Checklist
   :id: doc__time_slave_req_inspection
   :status: draft
-  :version: 2
-  :safety: ASIL_B
-  :security: YES
+  :version: 1
+  :safety: QM
+  :security: NO
   :realizes: wp__requirements_inspect
   :tags: time_slave
-
-.. note::
-   Work in progress: structure, titles, and needs IDs only. Content and req/comp/feat traceability links to follow in later PRs.
-
-.. attention::
-    The above directive must be updated according to your Component.
-
-    - Adjust ``status`` to be ``valid``
-    - Adjust ``safety``, ``security`` and ``tags`` according to your needs
 
 Requirement Inspection Checklist
 ================================
@@ -166,7 +157,7 @@ See also :need:`doc_concept__wp_inspections` for further information about revie
 .. attention::
     The above checklist entries must be filled according to your component requirements in scope.
 
-Note: If a Review ID is not applicable for your requirement, then state ""n/a" in status and comment accordingly in remarks.
+Note: If a Review ID is not applicable for your requirement, then state "n/a" in status and comment accordingly in remarks.
 
 The following requirements in "valid" state and with "inspected" tag set are in the scope of this inspection:
 
@@ -189,6 +180,3 @@ And also the following AoUs in "valid" state and with "inspected" tag set (for t
    :columns: id;status;tags
    :colwidths: 25,25,25
    :sort: title
-
-.. attention::
-    The above tables filtering must be updated according to your Component.
