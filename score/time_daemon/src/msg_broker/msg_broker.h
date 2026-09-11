@@ -28,17 +28,42 @@ namespace score
 namespace td
 {
 
+/// @brief Central publish-subscribe communication hub within the TimeDaemon.
 ///
-/// \brief Class to store each subscriber for dedicated topic. Idea is simple, any component can use subscribe with
-/// dedicated callback
-///        for explicit "topic". Then callback will be invoked when some component will call OnNewData() for dedicated
-///        topic.
+/// Manages topics and distributes messages to interested subscribers, enabling
+/// decoupled communication: components evolve independently without direct
+/// dependencies on each other.
 ///
+/// MessageBroker does not provide synchronization between publish and callback
+/// invocation. Callbacks run synchronously in caller's thread; no queuing.
+/// To separate control flows, use @c ControlFlowDivider.
+///
+/// @tparam T Message data type for this broker instance (e.g. PtpTimeInfo).
+///
+/// @see ControlFlowDivider For control flow separation between threads.
 template <typename T>
 class MessageBroker : public std::enable_shared_from_this<MessageBroker<T>>
 {
   public:
+    /// @brief Registers a consumer component to receive messages on the specified topic.
+    ///
+    /// Creates a subscription wrapping the consumer's @c OnMessage() callback and
+    /// adds it to the topic registry. Uses a weak_ptr to avoid prolonging the
+    /// consumer's lifetime.
+    ///
+    /// @pre Must be called during the initialization phase to ensure thread safety.
+    ///
+    /// @param topic           Topic name to subscribe to.
+    /// @param subscriber_weak Weak pointer to the consumer component.
     void AddSubscriber(const Topic& topic, std::weak_ptr<Consumer<T>> subscriber_weak);
+
+    /// @brief Registers a producer component to publish messages on the specified topic.
+    ///
+    /// Sets the producer's publish callback to invoke @c OnNewData() on this broker.
+    /// Uses a weak_ptr to avoid prolonging the producer's lifetime.
+    ///
+    /// @param topic         Topic name to publish on.
+    /// @param producer_weak Weak pointer to the producer component.
     void AddProducer(const Topic& topic, std::weak_ptr<Producer<T>> producer_weak);
 
   private:

@@ -32,29 +32,29 @@ namespace score
 namespace td
 {
 
-/**
- * @brief Component responsible for decoupling data flow and timing within VehicleTimeDaemon.
- *
- * The ControlFlowDivider acts as a buffer between data producers and consumers, ensuring
- * that timing-sensitive operations are not affected by blocking operations in downstream
- * components. It maintains consistent data publishing rates by using a dedicated thread
- * and internal buffering. When new data arrives, it processes all available data immediately.
- * If no new data arrives within the specified timeout, it republishes the last known data
- * to maintain consistent output timing.
- *
- * @tparam DataType The type of data being processed (e.g., PtpTimeInfo)
- * @tparam BufferSize The size of the internal circular buffer for storing incoming data
- */
+/// @brief Component responsible for decoupling data flow and timing within VehicleTimeDaemon.
+///
+/// The ControlFlowDivider acts as a buffer between data producers and consumers, ensuring
+/// that timing-sensitive operations are not affected by blocking operations in downstream
+/// components. It maintains consistent data publishing rates by using a dedicated thread
+/// and internal buffering. When new data arrives, it processes all available data immediately.
+/// If no new data arrives within the specified timeout, it republishes the last known data
+/// to maintain consistent output timing.
+///
+/// Thread safety: @c OnMessage() called from MessageBroker thread; @c OnEvent() called from
+/// worker thread; @c OnTimeout() called from worker thread (accesses @c last_data_ without lock,
+/// safe because only worker thread writes it). @c data_buffer_ synchronized via @c data_buffer_mutex_.
+///
+/// @tparam DataType  The type of data being processed (e.g. PtpTimeInfo).
+/// @tparam BufferSize The size of the internal circular buffer for incoming data.
 template <typename DataType, size_t BufferSize>
 class ControlFlowDivider final : public EventDrivenMachine, public Consumer<DataType>, public Producer<DataType>
 {
   public:
-    /**
-     * @brief Constructs a ControlFlowDivider with specified timeout.
-     *
-     * @param name The name of this control flow divider instance
-     * @param timeout Maximum time to wait for new data before republishing the last known data
-     */
+    /// @brief Constructs a ControlFlowDivider with the specified timeout.
+    ///
+    /// @param name    The name of this control flow divider instance.
+    /// @param timeout Maximum time to wait for new data before republishing the last known data.
     explicit ControlFlowDivider(const std::string& name, std::chrono::milliseconds timeout);
 
     ~ControlFlowDivider() override = default;
@@ -64,50 +64,48 @@ class ControlFlowDivider final : public EventDrivenMachine, public Consumer<Data
     ControlFlowDivider(ControlFlowDivider&&) = delete;
     ControlFlowDivider& operator=(ControlFlowDivider&&) = delete;
 
-    /**
-     * @brief Initialize machine
-     *
-     * As there is no explicit Init actions, it will be stubbed and return true.
-     *
-     * @param bool Init result
-     */
+    /// @brief Initialise the machine. Stubbed — returns true immediately as no
+    /// explicit initialisation actions are required.
     bool Init() override;
 
-    /**
-     * @brief Sets the callback function to be invoked when publishing data.
-     *
-     * @param callback Function to be called when data is published
-     */
+    /// @brief Sets the callback function to be invoked when publishing data.
+    ///
+    /// @param callback Function to be called when data is published.
     void SetPublishCallback(std::function<void(const DataType&)> callback) override;
 
-    /**
-     * @brief Receives new data and queues it for processing.
-     *
-     * This method receives incoming data, stores it in the internal buffer,
-     * and triggers the event-driven processing mechanism to handle the data.
-     * The operation is thread-safe and non-blocking.
-     *
-     * @param data The data to be queued for processing
-     */
+    /// @brief Receives new data and queues it for asynchronous processing.
+    ///
+    /// This method receives incoming data, stores it in the internal buffer,
+    /// and triggers the event-driven processing mechanism to handle the data.
+    /// The operation is thread-safe and non-blocking.
+    ///
+    /// @param data The data to be queued for processing.
     void OnMessage(DataType data) override;
 
   protected:
+    /// @brief Drains the circular buffer and publishes each queued item in FIFO order.
+    ///
+    /// Called by the EventDrivenMachine worker thread when @c OnMessage() triggers
+    /// an event. Acquires @c data_buffer_mutex_ and publishes all pending items.
     void OnEvent() noexcept override;
 
+    /// @brief Republishes the last known data when no new data has arrived within the timeout.
+    ///
+    /// Called by the EventDrivenMachine worker thread on timeout expiry. Publishes
+    /// the cached @c last_data_ to preserve a consistent output cadence even when
+    /// the upstream data flow stalls.
     void OnTimeout() noexcept override;
 
   private:
-    /**
-     * @brief Publishes data to the Message Broker.
-     *
-     * @param data The data to be published
-     */
+    /// @brief Publishes data to the MessageBroker via the registered callback.
+    ///
+    /// @param data The data to be published.
     void Publish(const DataType& data) override;
 
     std::mutex data_buffer_mutex_;
     score::cpp::circular_buffer<DataType, BufferSize> data_buffer_;
 
-    /** @brief Callback function for publishing data */
+    /// @brief Callback function for publishing data
     std::function<void(const DataType&)> publish_callback_;
 
     DataType last_data_;

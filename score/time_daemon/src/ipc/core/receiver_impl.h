@@ -22,13 +22,28 @@ namespace score
 namespace td
 {
 
+/// @brief IPC Machine receiver component for reading verified time data from
+/// the shared memory channel written by @c PublisherImpl.
 ///
-/// \brief Receiver impl class to receive data from ipc
+/// Opens an existing shared memory channel and reads the latest IPC-formatted
+/// time data. Used by the VehicleClock backend on the application
+/// side to retrieve time information from TimeDaemon.
 ///
+/// Thread-safe for multiple concurrent readers.
+/// @c SharedMemoryHandler::Receive() returns the latest snapshot atomically.
+/// The call is non-blocking and returns @c std::nullopt if no data is available.
+///
+/// @tparam IpcDataType Shared memory IPC data type (e.g. @c svt::TimeBaseSnapshot).
+///
+/// @see SvtReceiver Type alias for ReceiverImpl<svt::TimeBaseSnapshot>
+/// @see PublisherImpl TimeDaemon-side publisher component
 template <typename IpcDataType>
 class ReceiverImpl : public Receiver<IpcDataType>
 {
   public:
+    /// @brief Constructs the IPC receiver with a shared memory path.
+    ///
+    /// @param shared_memory_path POSIX shared memory name matching the publisher (e.g. /td_svt_ipc).
     ReceiverImpl(const std::string& shared_memory_path) noexcept
         : Receiver<IpcDataType>(), shm_handler_{shared_memory_path}
     {
@@ -40,8 +55,19 @@ class ReceiverImpl : public Receiver<IpcDataType>
     ReceiverImpl& operator=(ReceiverImpl&&) = delete;
     ~ReceiverImpl() override = default;
 
+    /// @brief Opens the existing shared memory IPC channel created by the publisher.
+    ///
+    /// Connects to the already-created segment by name; does not create a new segment.
+    /// Non-blocking; returns false immediately if segment not found.
+    ///
+    /// @return true if the shared memory segment was opened successfully.
     bool Init() noexcept override;
 
+    /// @brief Reads the latest time data from shared memory.
+    ///
+    /// Non-blocking. Returns @c std::nullopt if no new or valid sample is available.
+    ///
+    /// @return Latest IPC data if available, @c std::nullopt otherwise.
     std::optional<IpcDataType> Receive() noexcept override;
 
   private:

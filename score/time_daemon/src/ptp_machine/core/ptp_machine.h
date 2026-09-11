@@ -27,25 +27,34 @@ namespace score
 namespace td
 {
 
-/**
- * @brief Manages time synchronization by interfacing with the PTP engine.
- *
- * The PTPMachine class abstracts the interaction with the Precision Time Protocol (PTP) engine,
- * periodically retrieving time information and publishing it to interested subscribers.
- * It handles initialization, deinitialization, and error recovery for the PTP stack,
- * ensuring reliable and up-to-date time data delivery within the system.
- */
+/// @brief Retrieves raw PTP time data from the PTP stack and publishes it to
+/// the MessageBroker.
+///
+/// Wraps platform-specific PTP stack communication (e.g. ptpd via devctl or
+/// gPTP shared memory), making stack implementations exchangeable. Runs in a
+/// dedicated thread via @c PeriodicMachine to maintain a consistent publishing
+/// rate even when PTP stack communication experiences delays.
+///
+/// Data flow per period:
+///   1. @c PeriodicTask() called at the configured update interval.
+///   2. @c ReadPTPSnapshot() retrieves raw data from the PTP stack via @c engine_impl_.
+///   3. Data published to MessageBroker as the @c raw_ptp_data topic.
+///   4. @c ControlFlowDivider receives it and separates control flow for the pipeline.
+///
+/// @tparam PTPEngine Platform-specific PTP stack interface (e.g. ShmPTPEngine).
+///
+/// @see ControlFlowDivider For control flow separation.
+/// @see PtpTimeInfo For the data structure definition.
+/// @see PeriodicMachine For the threading model.
 template <class PTPEngine>
 class PTPMachine final : public PeriodicMachine, public Producer<PtpTimeInfo>
 {
   public:
-    /**
-     * @brief Constructs a PTPMachine with the specified name, update interval, and PTP engine arguments.
-     *
-     * @param name The name of the PTPMachine instance.
-     * @param updateInterval The interval at which time data is retrieved and published.
-     * @param args Arguments forwarded to the PTPEngine constructor.
-     */
+    /// @brief Constructs a PTPMachine with the specified name, update interval, and PTP engine arguments.
+    ///
+    /// @param name           The name of the PTPMachine instance.
+    /// @param updateInterval The interval at which time data is retrieved and published.
+    /// @param args           Arguments forwarded to the PTPEngine constructor.
     template <typename... PTPEngineArgs>
     explicit PTPMachine(const std::string& name, std::chrono::milliseconds updateInterval, PTPEngineArgs&&... args)
         : PeriodicMachine(name, updateInterval),
@@ -65,51 +74,40 @@ class PTPMachine final : public PeriodicMachine, public Producer<PtpTimeInfo>
     PTPMachine(PTPMachine&&) = delete;
     PTPMachine& operator=(PTPMachine&&) = delete;
 
-    /**
-     * @brief Initializes the PTP stack and prepares the machine for operation.
-     *
-     * Attempts to establish communication with the underlying PTP engine.
-     * This method should be called before starting periodic time synchronization tasks.
-     *
-     * @return true if initialization was successful, false otherwise
-     */
+    /// @brief Initialises the PTP stack and prepares the machine for operation.
+    ///
+    /// Attempts to establish communication with the underlying PTP engine.
+    /// Must be called before starting periodic time synchronisation tasks.
+    ///
+    /// @return true if initialisation was successful, false otherwise.
     bool Init() override;
 
-    /**
-     * @brief Sets the callback function to be invoked when publishing data.
-     *
-     * @param callback Function to be called when data is published
-     */
+    /// @brief Sets the callback function to be invoked when publishing data.
+    ///
+    /// @param callback Function to be called when data is published.
     void SetPublishCallback(std::function<void(const PtpTimeInfo&)> callback) override;
 
   protected:
-    /**
-     * @brief Periodically retrieves and publishes the latest PTP time data.
-     *
-     * Invoked at each update interval, this method obtains the current time information
-     * from the PTP engine and publishes it to subscribers. Handles error recovery if the
-     * PTP stack is not initialized or data retrieval fails.
-     */
+    /// @brief Periodically retrieves and publishes the latest PTP time data.
+    ///
+    /// Invoked at each update interval by the PeriodicMachine worker thread.
+    /// Obtains the current time information from the PTP engine and publishes
+    /// it to subscribers. On read failure or uninitialised engine, logs warning
+    /// and returns. @c Deinit() called explicitly in destructor.
     void PeriodicTask() noexcept override;
 
   private:
-    /**
-     * @brief Deinitializes the PTP stack and releases associated resources.
-     *
-     * Cleans up the connection to the underlying PTP engine and resets the internal state.
-     *
-     * @return true if deinitialization was successful, false otherwise
-     */
+    /// @brief Deinitialises the PTP stack and releases associated resources.
+    ///
+    /// Cleans up the connection to the underlying PTP engine and resets the internal state.
     void Deinit();
 
-    /**
-     * @brief Publishes time information data to registered subscribers.
-     *
-     * @param data The time information to publish
-     */
+    /// @brief Publishes time information data to the registered subscribers.
+    ///
+    /// @param data The time information to publish.
     void Publish(const PtpTimeInfo& data) override;
 
-    /** @brief Callback function invoked when publishing data */
+    /// @brief Callback invoked when publishing data.
     std::function<void(const PtpTimeInfo&)> publish_callback_;
 
     std::unique_ptr<PTPEngine> engine_impl_;
@@ -138,11 +136,11 @@ bool PTPMachine<PTPEngine>::Init()
 
         if (is_initialized_)
         {
-            score::mw::log::LogInfo(kPtpMachineContext) << "QPTP stack initialized successfully";
+            score::mw::log::LogInfo(kPtpMachineContext) << "PTP stack initialized successfully";
         }
         else
         {
-            score::mw::log::LogError(kPtpMachineContext) << "QPTP stack initialization failed";
+            score::mw::log::LogError(kPtpMachineContext) << "PTP stack initialization failed";
         }
     }
 

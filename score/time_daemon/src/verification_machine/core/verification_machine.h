@@ -29,28 +29,33 @@ namespace score
 namespace td
 {
 
-/**
- * @brief Machine component responsible for validating and qualifying time information.
- *
- * The VerificationMachine implements a pipeline pattern where each stage performs
- * specific validation and adds appropriate qualifiers to the provided data.
- */
+/// @brief Validates and qualifies time information received from the PTP Machine.
+///
+/// Implements a configurable pipeline pattern where each stage performs a
+/// specific validation and adds appropriate qualifiers to the provided data.
+/// The pipeline is assembled at construction time from factory functions.
+///
+/// Typical validation stages:
+///   1. Sync state validation
+///   2. Timeout detection
+///   3. Time jump detection (forward / backward)
+///
+/// @tparam DataType The data type being validated (e.g. PtpTimeInfo).
 template <typename DataType>
 class VerificationMachine final : public ReactiveMachine, public Consumer<DataType>, public Producer<DataType>
 {
   public:
-    /**
-     * @brief Constructor for VerificationMachine with validator factories.
-     *
-     * Each factory creates one validation stage. Stages are processed in the order
-     * they are provided (first factory creates first stage in pipeline).
-     *
-     * @tparam Factories Types of factory functions
-     * @param name The name of this verification machine instance
-     * @param factories Factory functions to create each validator. Each factory
-     *        must return a unique_ptr to a VerificationStage<DataType>.
-     *        Factories can be lambdas, std::bind expressions, or function pointers.
-     */
+    /// @brief Constructs a VerificationMachine from a set of validator factories.
+    ///
+    /// Each factory creates one validation stage. Stages are processed in the order
+    /// they are provided (first factory creates first stage in pipeline).
+    ///
+    /// @tparam Factories Types of factory functions.
+    /// @param name      The name of this verification machine instance.
+    /// @param factories Factory functions to create each validator. Each factory
+    ///                  must return @c unique_ptr<VerificationStage<DataType>>;
+    ///                  nullptr causes assertion. Factories can be lambdas, @c std::bind
+    ///                  expressions, or function pointers.
     template <typename... Factories>
     explicit VerificationMachine(const std::string& name, Factories&&... factories)
         : ReactiveMachine(name), Consumer<DataType>(), Producer<DataType>(), pipeline_(), publish_callback_()
@@ -68,33 +73,22 @@ class VerificationMachine final : public ReactiveMachine, public Consumer<DataTy
     VerificationMachine& operator=(VerificationMachine&&) = delete;
     ~VerificationMachine() override = default;
 
-    /**
-     * @brief Sets the callback function to be invoked when publishing data.
-     *
-     * This method allows external components (typically the message broker)
-     * to register a callback that will be invoked when this producer publishes
-     * data.
-     *
-     * @param callback Function to be called when data is published
-     */
+    /// @brief Sets the callback function to be invoked when publishing data.
+    ///
+    /// Allows external components (typically the @c MessageBroker) to register a
+    /// callback that will be invoked when this producer publishes data.
+    ///
+    /// @param callback Function to be called when data is published.
     void SetPublishCallback(std::function<void(const DataType&)> callback) override;
 
-    /**
-     * @brief Process the received time information.
-     *
-     * This method is responsible for processing the time information data.
-     *
-     * @param data The time information data to be processed
-     */
+    /// @brief Receives time information, runs it through the validation pipeline, and publishes the result.
+    ///
+    /// @param data The time information data to be processed.
     void OnMessage(DataType data) override;
 
-    /**
-     * @brief Initialize machine
-     *
-     * As there is no explicit Init actions, it will be stubbed and return true.
-     *
-     * @param bool Init result
-     */
+    /// @brief Initialize the machine. Stubbed — returns true immediately as no
+    /// explicit initialization actions are required.
+    /// @return true
     bool Init() override;
 
   private:
@@ -103,30 +97,23 @@ class VerificationMachine final : public ReactiveMachine, public Consumer<DataTy
     using StagePtr = std::unique_ptr<Stage>;
     using StageFactory = std::function<StagePtr()>;
 
-    /**
-     * @brief Publishes the time information data using the registered callback.
-     *
-     * This method invokes the previously set publish callback to distribute
-     * the data to interested consumers.
-     *
-     * @param data The data to be published
-     */
+    /// @brief Publishes the time information data using the registered callback.
+    ///
+    /// @param data The data to be published.
     void Publish(const DataType& data) override;
 
-    /**
-     * @brief Sets up the validation pipeline by creating and connecting stages.
-     */
+    /// @brief Sets up the validation pipeline by creating and connecting stages.
+    ///
+    /// Stages are connected in factory order: output of stage N becomes input of stage N+1.
     void SetupPipeline(const std::vector<StageFactory>& factories);
 
-    /**
-     * @brief Processes time information through the validation pipeline.
-     *
-     * @param data The time information to validate
-     * @return The validated and qualified time information
-     */
+    /// @brief Runs data through all validation pipeline stages sequentially.
+    ///
+    /// @param data The time information to validate.
+    /// @return The validated and qualified time information.
     auto ProcessMessage(DataType data) -> DataType;
 
-    /** @brief First stage in the validation pipeline */
+    /// @brief First stage in the validation pipeline.
     std::unique_ptr<Stage> pipeline_;
 
     std::function<void(const DataType&)> publish_callback_;
