@@ -20,16 +20,14 @@ namespace score
 namespace time
 {
 
-///
-/// \brief Tag for the HW timer on the local Ethernet device where PTP messages are
+/// @brief Tag for the HW timer on the local Ethernet device where PTP messages are
 ///        received and which gets utilized for ingress & egress timestamping.
-///
 struct LocalPTPDeviceTimer
 {
     using Duration = std::chrono::nanoseconds;
 };
 
-/// \brief Time-point type for the local PTP device timer.
+/// @brief Time-point type for the local PTP device timer.
 using LocalPTPDeviceTimerValue = std::chrono::time_point<LocalPTPDeviceTimer, LocalPTPDeviceTimer::Duration>;
 
 }  // namespace time

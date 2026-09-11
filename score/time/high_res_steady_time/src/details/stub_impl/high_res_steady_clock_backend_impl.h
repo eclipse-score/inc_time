@@ -41,6 +41,7 @@ class HighResSteadyClockBackendImpl final : public HighResSteadyClockBackend
     HighResSteadyClockBackendImpl(HighResSteadyClockBackendImpl&&) = delete;
     HighResSteadyClockBackendImpl& operator=(HighResSteadyClockBackendImpl&&) = delete;
 
+    /// @brief Returns the current HIRS snapshot from std::chrono::steady_clock.
     ClockSnapshot<HighResSteadyTime::Timepoint, NoStatus> Now() const noexcept override
     {
         const auto raw = std::chrono::steady_clock::now().time_since_epoch();

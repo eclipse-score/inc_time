@@ -21,7 +21,11 @@ namespace score
 namespace time
 {
 
-/// @brief A snapshot of a clock reading at one instant, bundled with its quality metadata.
+/// @brief Immutable snapshot of a clock reading at one instant, bundled with its quality metadata.
+///
+/// Returned by @c Clock<Tag>::Now(), capturing the time-point and status together.
+/// Immutability prevents time-of-check-time-of-use bugs where separate @c GetTime() / @c GetStatus()
+/// calls could observe different backend snapshots.
 ///
 /// @tparam TimepointT  The time-point type (e.g. VehicleTime::Timepoint or
 ///                     std::chrono::steady_clock::time_point).
@@ -31,7 +35,7 @@ template <typename TimepointT, typename StatusT>
 class ClockSnapshot
 {
   public:
-    /// @brief Default constructor. Value-initialises both fields.
+    /// @brief Default constructor. Value-initializes both fields.
     ClockSnapshot() = default;
 
     /// @brief Explicit constructor.

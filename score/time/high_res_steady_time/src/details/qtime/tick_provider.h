@@ -24,7 +24,7 @@ namespace high_res_steady_time
 namespace qtime
 {
 
-/// \brief Returns the number of hardware clock cycles per second from the QNX syspage.
+/// @brief Returns the number of hardware clock cycles per second from the QNX syspage.
 ///
 /// Extracted as a free function so it can be replaced by a mock in unit tests.
 std::uint64_t GetClockCyclesPerSec();

@@ -33,7 +33,10 @@ struct ClockTraits<HighResSteadyTime>
     using Timepoint = HighResSteadyTime::Timepoint;
     using Snapshot = ClockSnapshot<Timepoint, NoStatus>;
 
-    /// \brief Obtains the current HIRS clock snapshot from the backend.
+    /// @brief Obtains the current HIRS clock snapshot from the backend.
+    ///
+    /// @param impl  The backend implementation to call.
+    /// @return The current HIRS clock snapshot.
     static Snapshot CallNow(const Backend& impl) noexcept;
 };
 

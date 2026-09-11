@@ -25,54 +25,63 @@ namespace score
 namespace time
 {
 
-///
-/// \brief Pure-virtual pimpl interface for the vehicle time domain backend.
+/// @brief Pure-virtual backend contract for the vehicle time domain.
 ///
 /// INTERNAL — must not be included by user code.
 /// Consumers: test mocks and backend implementations under details/.
+/// This type documents backend-agnostic behavior only.
 ///
+/// @see Clock<VehicleTime> Public API using this backend via pimpl
 class VehicleClockBackend
 {
   public:
     virtual ~VehicleClockBackend() noexcept = default;
 
-    /// \brief Returns the current vehicle time snapshot (time-point + quality status).
+    /// @brief Returns the current vehicle time snapshot (time-point + quality status).
     virtual ClockSnapshot<VehicleTime::Timepoint, VehicleTimeStatus> Now() const noexcept = 0;
 
-    /// \brief Initialises the backend resource.
+    /// @brief Initializes backend resource(s).
     ///
-    /// Idempotent: a second call on an already-initialised backend returns \c true immediately.
+    /// Establishes communication with implementation-defined data sources.
+    /// Idempotent: second call on already-initialised backend returns @c true
+    /// immediately.
     ///
-    /// \return \c true on success; \c false on failure.
+    /// @return @c true on success; @c false on failure.
     virtual bool Init() noexcept = 0;
 
-    /// \brief Returns true if the vehicle time backend resource is available.
+    /// @brief Returns true if backend resource(s) are available.
+    ///
+    /// Non-blocking check. Availability criteria are implementation-defined.
     virtual bool IsAvailable() const noexcept = 0;
 
-    /// \brief Blocks until the vehicle time resource is available or the deadline / stop-token fires.
+    /// @brief Blocks until backend becomes available or wait is aborted.
     ///
-    /// \param token  Stop token that can interrupt the wait.
-    /// \param until  Steady-clock deadline after which the wait is abandoned.
+    /// @param token  Stop token that can interrupt the wait.
+    /// @param until  Steady-clock deadline after which the wait is abandoned.
     ///
-    /// \return true if the resource became available, false if the wait was aborted.
+    /// @return true if backend became available, false if deadline or token aborted wait.
     virtual bool WaitUntilAvailable(const score::cpp::stop_token& token,
                                     std::chrono::steady_clock::time_point until) const noexcept = 0;
 
-    /// \brief Installs the callback invoked when new time-sync data arrives.
+    /// @brief Installs callback invoked when new time-sync data arrives.
+    ///
+    /// Trigger conditions depend on backend implementation.
     virtual void SetTimeSlaveSyncDataReceivedCallback(
         VehicleTime::TimeSlaveSyncDataReceivedCallback&& callback) noexcept = 0;
 
-    /// \brief Removes the time-sync data callback.
+    /// @brief Removes the time-sync data callback.
     virtual void UnsetTimeSlaveSyncDataReceivedCallback() noexcept = 0;
 
-    /// \brief Installs the callback invoked after a finished pDelay measurement.
+    /// @brief Installs callback invoked after finished pDelay measurement.
+    ///
+    /// Trigger conditions depend on backend implementation.
     virtual void SetPDelayMeasurementFinishedCallback(
         VehicleTime::PDelayMeasurementFinishedCallback&& callback) noexcept = 0;
 
-    /// \brief Removes the pDelay measurement callback.
+    /// @brief Removes the pDelay measurement callback.
     virtual void UnsetPDelayMeasurementFinishedCallback() noexcept = 0;
 
-    /// \brief Installs the callback invoked when VehicleTimeStatus flags change.
+    /// @brief Installs the callback invoked when VehicleTimeStatus flags change.
     ///
     /// The callback fires:
     ///  - unconditionally on the first \c Now() call after registration; and
@@ -83,7 +92,7 @@ class VehicleClockBackend
     /// a background polling thread.  The implementation must be thread-safe.
     virtual void SetStatusChangedCallback(VehicleTime::StatusChangedCallback&& callback) noexcept = 0;
 
-    /// \brief Removes the status-changed callback.
+    /// @brief Removes the status-changed callback.
     virtual void UnsetStatusChangedCallback() noexcept = 0;
 };
 

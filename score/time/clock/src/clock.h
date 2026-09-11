@@ -54,10 +54,12 @@ std::shared_ptr<typename ClockTraits<Tag>::Backend> CreateBackend();
 
 }  // namespace detail
 
-/// @brief Unified clock value wrapper.
+/// @brief Unified clock-domain-agnostic API for reading time snapshots.
 ///
-/// @tparam Tag  Clock domain tag struct (e.g. VehicleTime, HighResSteadyTime,
-///              std::chrono::steady_clock).
+/// Separates what kind of time (tag struct: @c VehicleTime, @c HighResSteadyTime,
+/// @c std::chrono::steady_clock) from how to access it (always @c Clock<Tag>::GetInstance()).
+/// Domain selection is compile-time: a component depending on @c Clock<HighResSteadyTime> cannot
+/// accidentally read @c VehicleTime at runtime.
 ///
 /// All clock domains share the same API surface:
 ///   - @c Now()                  — snapshot (time_point + optional quality status)
@@ -70,6 +72,10 @@ std::shared_ptr<typename ClockTraits<Tag>::Backend> CreateBackend();
 /// @c Clock<Tag> is cheaply copyable: copying bumps the shared_ptr ref-count so
 /// both copies share the same backend. Move transfers exclusive ownership.
 ///
+/// Thread safety: @c GetInstance() is thread-safe (mutex-protected). Instance state is immutable
+/// after construction; @c Now() delegates to backend (thread safety depends on backend).
+///
+/// @tparam Tag Clock domain tag struct (e.g. VehicleTime, HighResSteadyTime, std::chrono::steady_clock).
 template <typename Tag>
 class Clock
 {
@@ -84,6 +90,9 @@ class Clock
     using Snapshot = typename Trait::Snapshot;
 
     /// @brief Returns the process-wide @c Clock<Tag> handle.
+    ///
+    /// Acquires @c instance_guard_ mutex to protect static state. Returns override if active,
+    /// cached instance if alive, or creates fresh backend via @c detail::CreateBackend<Tag>().
     [[nodiscard]] static Clock GetInstance() noexcept
     {
         std::lock_guard<std::mutex> lock{instance_guard_};
@@ -101,6 +110,8 @@ class Clock
     }
 
     /// @brief Returns the current clock snapshot (time_point + optional status).
+    ///
+    /// Delegates to backend via @c Trait::CallNow(). Synchronous; thread safety depends on backend.
     [[nodiscard]] Snapshot Now() const noexcept
     {
         return Trait::CallNow(*impl_);
@@ -109,7 +120,8 @@ class Clock
     /// @brief Subscribes to a clock event of type @p EventType.
     ///
     /// A @c SubscriptionHook<Tag, EventType> specialization must exist; otherwise
-    /// this call is a compile error (incomplete type).
+    /// this call is a compile error (incomplete type). Callback is moved to backend.
+    /// Thread safety depends on hook implementation for Tag/EventType pair.
     ///
     /// @tparam EventType  The event struct type.
     /// @param  cb         Callback invoked on each event.
@@ -126,7 +138,7 @@ class Clock
         SubscriptionHook<Tag, EventType>::Unsubscribe(*impl_);
     }
 
-    /// @brief Initialises the clock backend resource.
+    /// @brief Initializes the clock backend resource.
     ///
     /// Must be called once by the handle owner before reading time. Until @c Init() returns
     /// @c true, @c Now() returns a snapshot with @c kUnknown status. If @c Init() returns
@@ -195,7 +207,9 @@ class Clock
         instance_override_.reset();
     }
 
-    /// @c GetInstance() is the sole caller of this constructor.
+    /// @brief Private constructor called only by @c GetInstance().
+    ///
+    /// Takes ownership of @p impl (moved).
     explicit Clock(std::shared_ptr<Backend> impl) noexcept : impl_{std::move(impl)} {}
 
     /// Shared backend handle. Copying @c Clock<Tag> shares the same backend instance.

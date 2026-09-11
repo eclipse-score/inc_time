@@ -23,13 +23,13 @@ namespace time
 {
 
 ///
-/// \brief Pure-virtual pimpl interface for the HIRS time domain backend.
+/// @brief Pure-virtual pimpl interface for the HIRS time domain backend.
 class HighResSteadyClockBackend
 {
   public:
     virtual ~HighResSteadyClockBackend() noexcept = default;
 
-    /// \brief Returns the current HIRS snapshot (time-point; status is NoStatus).
+    /// @brief Returns the current HIRS snapshot (time-point; status is NoStatus).
     virtual ClockSnapshot<HighResSteadyTime::Timepoint, NoStatus> Now() const noexcept = 0;
 };
 

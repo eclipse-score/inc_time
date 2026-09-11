@@ -27,44 +27,44 @@ namespace time
 {
 
 ///
-/// \brief Data delivered after a pDelay measurement performed by a Time Slave.
+/// @brief Data delivered after a pDelay measurement performed by a Time Slave.
 ///
 /// @tparam Timebase  The clock domain tag (e.g. @c VehicleTime).
 ///
 template <typename Timebase>
 struct PDelayMeasurementData
 {
-    /// \brief Time Slave's local time at the point where it transmitted the pDelay Request Frame.
+    /// @brief Time Slave's local time at the point where it transmitted the pDelay Request Frame.
     LocalPTPDeviceTimerValue request_origin_timestamp{};
 
-    /// \brief Time Master's timestamp at which it received the pDelay Request Frame.
+    /// @brief Time Master's timestamp at which it received the pDelay Request Frame.
     MasterPTPDeviceTimerValue request_receipt_timestamp{};
 
-    /// \brief Time Master's timestamp at which it transmitted the pDelay Response Frame.
+    /// @brief Time Master's timestamp at which it transmitted the pDelay Response Frame.
     MasterPTPDeviceTimerValue response_origin_timestamp{};
 
-    /// \brief Time Slave's local time at the point where it received the pDelay Response Frame.
+    /// @brief Time Slave's local time at the point where it received the pDelay Response Frame.
     LocalPTPDeviceTimerValue response_receipt_timestamp{};
 
-    /// \brief Time Slave's global timestamp at which the pDelay measurement was initiated.
+    /// @brief Time Slave's global timestamp at which the pDelay measurement was initiated.
     typename Timebase::Timepoint reference_global_timestamp{};
 
-    /// \brief Time Slave's local time at the point where it captured @c reference_global_timestamp.
+    /// @brief Time Slave's local time at the point where it captured @c reference_global_timestamp.
     LocalPTPDeviceTimerValue reference_local_timestamp{};
 
-    /// \brief Sequence number of the pDelay Request Frame.
+    /// @brief Sequence number of the pDelay Request Frame.
     std::uint16_t sequence_id{};
 
-    /// \brief Measured pDelay value.
+    /// @brief Measured pDelay value.
     std::chrono::nanoseconds pdelay{};
 
-    /// \brief Identity of the port from where the pDelay measurement was initiated.
+    /// @brief Identity of the port from where the pDelay measurement was initiated.
     PortIdentity request_port_identity{};
 
-    /// \brief Identity of the port that responded to the pDelay measurement.
+    /// @brief Identity of the port that responded to the pDelay measurement.
     PortIdentity response_port_identity{};
 
-    /// \brief Prints the data to any output stream.
+    /// @brief Prints the data to any output stream.
     template <typename OutputStream>
     auto& PrintTo(OutputStream& output_stream) const
     {
@@ -81,14 +81,14 @@ struct PDelayMeasurementData
     }
 };
 
-/// \brief Stream output operator for @c PDelayMeasurementData.
+/// @brief Stream output operator for @c PDelayMeasurementData.
 template <typename OutputStream, typename Timebase>
 auto& operator<<(OutputStream& output_stream, const PDelayMeasurementData<Timebase>& pdelay_data)
 {
     return pdelay_data.PrintTo(output_stream);
 }
 
-/// \brief GTest PrintTo overload for @c PDelayMeasurementData.
+/// @brief GTest PrintTo overload for @c PDelayMeasurementData.
 template <typename Timebase>
 /* The dereference output_stream is passed as a non-const reference. Therefore, output_stream should be a pointer to a
  * non-const. */

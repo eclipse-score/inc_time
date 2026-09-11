@@ -27,12 +27,10 @@ namespace high_res_steady_time
 namespace qtime
 {
 
-///
-/// \brief QNX production backend for HighResSteadyTime.
+/// @brief QNX production backend for HighResSteadyTime.
 ///
 /// Reads the current time from the QNX hardware clock via @c Neutrino::ClockCycles()
 /// and converts the raw cycle count to nanoseconds using @c GetClockCyclesPerSec().
-///
 class HighResSteadyQClock final : public HighResSteadyClockBackend
 {
   public:
@@ -43,11 +41,14 @@ class HighResSteadyQClock final : public HighResSteadyClockBackend
     HighResSteadyQClock& operator=(HighResSteadyQClock&&) = delete;
     ~HighResSteadyQClock() noexcept override = default;
 
-    /// \brief Returns the current HIRS snapshot from the QNX hardware clock.
+    /// @brief Returns the current HIRS snapshot from the QNX hardware clock.
+    /// @return The current HIRS clock snapshot.
     ClockSnapshot<HighResSteadyTime::Timepoint, NoStatus> Now() const noexcept override;
 
   private:
-    /// \brief Converts raw hardware clock cycles to nanoseconds.
+    /// @brief Converts raw hardware clock cycles to nanoseconds.
+    /// @param clock_cycles  The raw cycle count from @c Neutrino::ClockCycles().
+    /// @return The equivalent duration in nanoseconds.
     std::chrono::nanoseconds ClockCyclesToNanoseconds(std::uint64_t clock_cycles) const noexcept;
 };
 

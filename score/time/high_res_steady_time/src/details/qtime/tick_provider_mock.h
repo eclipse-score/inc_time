@@ -29,7 +29,7 @@ namespace high_res_steady_time
 namespace qtime
 {
 
-/// \brief Singleton GMock replacement for @c GetClockCyclesPerSec().
+/// @brief Singleton GMock replacement for @c GetClockCyclesPerSec().
 ///
 /// Usage:
 /// @code

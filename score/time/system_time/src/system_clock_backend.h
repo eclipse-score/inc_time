@@ -26,7 +26,7 @@ namespace time
 {
 
 ///
-/// \brief Abstract backend interface for the system-clock domain.
+/// @brief Abstract backend interface for the system-clock domain.
 ///
 /// Concrete implementations live in SystemTime/details/.
 /// This header is the contract shared by Clock<std::chrono::system_clock>,
@@ -37,7 +37,7 @@ class SystemClockBackend
   public:
     virtual ~SystemClockBackend() noexcept = default;
 
-    /// \brief Returns the current system-clock snapshot.
+    /// @brief Returns the current system-clock snapshot.
     virtual ClockSnapshot<std::chrono::system_clock::time_point, NoStatus> Now() const noexcept = 0;
 };
 

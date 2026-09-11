@@ -22,6 +22,7 @@ namespace time
 namespace detail
 {
 
+/// @brief Logging context for vehicle time domain.
 constexpr auto kVehicleTimeLogContext = "MVTC";
 
 }  // namespace detail

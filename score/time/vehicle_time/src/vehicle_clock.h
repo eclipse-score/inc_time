@@ -41,7 +41,7 @@ struct ClockTraits<VehicleTime>
     using Timepoint = VehicleTime::Timepoint;
     using Snapshot = ClockSnapshot<Timepoint, VehicleTimeStatus>;
 
-    /// \brief Obtains the current vehicle time snapshot from the backend.
+    /// @brief Obtains the current vehicle time snapshot from the backend.
     static Snapshot CallNow(const Backend& impl) noexcept;
 };
 
@@ -50,7 +50,7 @@ struct InitializationHook<VehicleTime>
 {
     using Backend = ClockTraits<VehicleTime>::Backend;
 
-    /// \brief Delegates to \c VehicleClockBackend::Init().
+    /// @brief Delegates to \c VehicleClockBackend::Init().
     static bool CallInit(Backend& impl) noexcept;
 };
 
@@ -59,7 +59,7 @@ struct AvailabilityHook<VehicleTime>
 {
     using Backend = ClockTraits<VehicleTime>::Backend;
 
-    /// \brief Returns true if the vehicle time backend resource is available.
+    /// @brief Returns true if the vehicle time backend resource is available.
     static bool CallIsAvailable(const Backend& impl) noexcept;
 
     /// @brief Blocks until the vehicle time resource is available or deadline / stop-token fires.

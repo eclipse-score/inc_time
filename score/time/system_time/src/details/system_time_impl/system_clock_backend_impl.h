@@ -40,6 +40,7 @@ class SystemClockBackendImpl final : public SystemClockBackend
     SystemClockBackendImpl(SystemClockBackendImpl&&) = delete;
     SystemClockBackendImpl& operator=(SystemClockBackendImpl&&) = delete;
 
+    /// @brief Returns the current system-clock snapshot using std::chrono::system_clock.
     ClockSnapshot<std::chrono::system_clock::time_point, NoStatus> Now() const noexcept override
     {
         return ClockSnapshot<std::chrono::system_clock::time_point, NoStatus>{std::chrono::system_clock::now(),

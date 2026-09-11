@@ -32,7 +32,7 @@ namespace time
 struct VehicleTimeStatus;
 
 ///
-/// \brief Tag struct for the PTP-synchronized vehicle time domain.
+/// @brief Tag struct for the PTP-synchronized vehicle time domain.
 ///
 /// Contains only domain types — no vtable, no factory, no virtual methods.
 /// The implementation is hidden behind VehicleClockBackend (see VehicleTime/vehicle_clock_backend.h).
@@ -40,7 +40,7 @@ struct VehicleTimeStatus;
 struct VehicleTime
 {
     ///
-    /// \brief Enumeration expressing the synchronisation quality state of the vehicle time domain.
+    /// @brief Enumeration expressing the synchronisation quality state of the vehicle time domain.
     /// Each enumerator is a **bit position** (not a bitmask).
     ///
     enum class StatusFlag : std::uint8_t
@@ -64,27 +64,27 @@ struct VehicleTime
     using StatusChangedCallback = score::cpp::callback<void(const VehicleTimeStatus&), kCallbackCapacity>;
 };
 
-/// \brief Formats all active VehicleTime status flags into an ostringstream for diagnostics.
+/// @brief Formats all active VehicleTime status flags into an ostringstream for diagnostics.
 template <>
 std::ostringstream ClockStatus<VehicleTime::StatusFlag>::PrintTo() const;
 
 ///
-/// \brief Synchronisation-quality status snapshot for the vehicle time domain.
+/// @brief Synchronisation-quality status snapshot for the vehicle time domain.
 ///
 /// Bundled alongside the time-point inside ClockSnapshot<VehicleTime::Timepoint, VehicleTimeStatus>.
 ///
 struct VehicleTimeStatus
 {
-    /// \brief Bit-flag quality indicators for the vehicle time signal.
+    /// @brief Bit-flag quality indicators for the vehicle time signal.
     ClockStatus<VehicleTime::StatusFlag> flags{};
 
-    /// \brief Fractional rate deviation of the local clock relative to the Grand Master.
+    /// @brief Fractional rate deviation of the local clock relative to the Grand Master.
     ///        Unit: dimensionless (e.g. 1.0e-9 == 1 ppb).
     double rate_deviation{0.0};
 
     // Convenience delegates — avoid .flags. indirection at call sites.
 
-    /// \brief Returns true if the vehicle time data is reliable for use right now.
+    /// @brief Returns true if the vehicle time data is reliable for use right now.
     ///
     /// Reliable := kSynchronized is set AND none of {kTimeOut, kTimeLeapFuture, kTimeLeapPast} is set.
     bool IsReliable() const noexcept
@@ -95,7 +95,7 @@ struct VehicleTimeStatus
                                             VehicleTime::StatusFlag::kTimeLeapPast})));
     }
 
-    /// \brief Returns true if the vehicle time has been synchronized at least once during this lifecycle.
+    /// @brief Returns true if the vehicle time has been synchronized at least once during this lifecycle.
     ///
     /// HasBeenSynchronized := kSynchronized flag is set, regardless of any active fault flags.
     bool HasBeenSynchronized() const noexcept
@@ -103,7 +103,7 @@ struct VehicleTimeStatus
         return flags.IsFlagActive(VehicleTime::StatusFlag::kSynchronized);
     }
 
-    /// \brief Returns true if the vehicle time status flags are internally consistent (no contradictory combination).
+    /// @brief Returns true if the vehicle time status flags are internally consistent (no contradictory combination).
     ///
     /// Consistent := at least one flag is set AND kTimeLeapFuture and kTimeLeapPast are not both set simultaneously.
     bool IsConsistent() const noexcept
@@ -123,14 +123,14 @@ struct VehicleTimeStatus
         return true;
     }
 
-    /// \brief Returns the fractional rate deviation of the local clock relative to the Grand Master.
+    /// @brief Returns the fractional rate deviation of the local clock relative to the Grand Master.
     ///        Unit: dimensionless (e.g. 1.0e-9 == 1 ppb).
     double RateDeviation() const noexcept
     {
         return rate_deviation;
     }
 
-    /// \brief Returns true if the given StatusFlag bit-position is active.
+    /// @brief Returns true if the given StatusFlag bit-position is active.
     bool IsFlagActive(const VehicleTime::StatusFlag flag) const noexcept
     {
         return flags.IsFlagActive(flag);

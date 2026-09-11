@@ -20,17 +20,15 @@ namespace score
 namespace time
 {
 
-///
-/// \brief Tag for the HW timer on the PTP time master's Ethernet device where the
+/// @brief Tag for the HW timer on the PTP time master's Ethernet device where the
 ///        PTP client's pDelay measurement request packets are received and the
 ///        corresponding reply packets will be sent.
-///
 struct MasterPTPDeviceTimer
 {
     using Duration = std::chrono::nanoseconds;
 };
 
-/// \brief Time-point type for the master PTP device timer.
+/// @brief Time-point type for the master PTP device timer.
 using MasterPTPDeviceTimerValue = std::chrono::time_point<MasterPTPDeviceTimer, MasterPTPDeviceTimer::Duration>;
 
 }  // namespace time

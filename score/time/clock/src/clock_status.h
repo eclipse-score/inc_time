@@ -68,6 +68,7 @@ class ClockStatus final
     /// @brief Returns @c true if the given flag bit-position is set in this status.
     ///
     /// @param flag  The bit-position to test.
+    /// @return @c true if the bit-position is set; @c false otherwise.
     [[nodiscard]] bool IsFlagActive(const FlagEnumT flag) const noexcept
     {
         const PositionT flag_position{static_cast<PositionT>(flag)};
@@ -80,6 +81,7 @@ class ClockStatus final
     /// @brief Returns @c true if any of the given flag bit-positions is set in this status.
     ///
     /// @param flag_list  The bit-positions to test.
+    /// @return @c true if any of the bit-positions is set; @c false otherwise.
     [[nodiscard]] bool IsAnyOfFlagsActive(const std::initializer_list<FlagEnumT>& flag_list) const noexcept
     {
         bool is_any_flag_set{false};
@@ -109,6 +111,8 @@ class ClockStatus final
     /// }
     /// @endcode
     ///
+    /// @return An @c ostringstream containing the names of all active flags, separated by spaces.
+    ///
     /// @note Coverage of this method lives in the domain-level test (e.g.
     ///       @c vehicle_time_status_test.cpp), not in this file.
     std::ostringstream PrintTo() const;
@@ -122,6 +126,7 @@ class ClockStatus final
     }
 
     /// @brief Compares two @c ClockStatus objects for equality.
+    /// @return @c true if both objects have the same set of active flags; @c false otherwise.
     friend bool operator==(const ClockStatus& lhs, const ClockStatus& rhs) noexcept
     {
         return lhs.status_flags_ == rhs.status_flags_;

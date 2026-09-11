@@ -40,6 +40,7 @@ class SteadyClockBackendImpl final : public SteadyClockBackend
     SteadyClockBackendImpl(SteadyClockBackendImpl&&) = delete;
     SteadyClockBackendImpl& operator=(SteadyClockBackendImpl&&) = delete;
 
+    /// @brief Returns the current steady-clock snapshot using std::chrono::steady_clock.
     ClockSnapshot<std::chrono::steady_clock::time_point, NoStatus> Now() const noexcept override
     {
         return ClockSnapshot<std::chrono::steady_clock::time_point, NoStatus>{std::chrono::steady_clock::now(),

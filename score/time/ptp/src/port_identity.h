@@ -21,16 +21,20 @@ namespace score
 namespace time
 {
 
-/// \brief Identifies a participant (port) involved in PTP communication.
+/// @brief Identifies a participant (port) involved in PTP communication.
 struct PortIdentity
 {
-    /// \brief Clock identity of the PTP port.
+    /// @brief Clock identity of the PTP port.
     std::uint64_t clock_identity{};
 
-    /// \brief Port number of the PTP port.
+    /// @brief Port number of the PTP port.
     std::uint16_t port_number{};
 
-    /// \brief Prints the identity to any output stream.
+    /// @brief Prints the identity to any output stream.
+    ///
+    /// @tparam OutputStream  Type of the output stream (e.g. std::ostream).
+    /// @param output_stream  The output stream to print to.
+    /// @return Reference to the output stream for chaining.
     template <typename OutputStream>
     auto& PrintTo(OutputStream& output_stream) const
     {
@@ -40,7 +44,12 @@ struct PortIdentity
     }
 };
 
-/// \brief Stream output operator for @c PortIdentity.
+/// @brief Stream output operator for @c PortIdentity.
+///
+/// @tparam OutputStream  Type of the output stream (e.g. std::ostream).
+/// @param output_stream  The output stream to print to.
+/// @param port_identity  The @c PortIdentity to print.
+/// @return Reference to the output stream for chaining.
 template <typename OutputStream>
 auto& operator<<(OutputStream& output_stream, const PortIdentity& port_identity)
 {

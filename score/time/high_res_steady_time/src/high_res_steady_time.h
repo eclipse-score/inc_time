@@ -21,7 +21,7 @@ namespace time
 {
 
 ///
-/// \brief Tag struct for the High-Resolution Steady (HIRS) time domain.
+/// @brief Tag struct for the High-Resolution Steady (HIRS) time domain.
 struct HighResSteadyTime
 {
     using Duration = std::chrono::nanoseconds;

@@ -26,6 +26,7 @@ namespace time
 
 class SystemClockBackend;
 
+/// @brief Specialization of @c ClockTraits for the std::chrono::system_clock domain.
 template <>
 struct ClockTraits<std::chrono::system_clock>
 {
@@ -34,7 +35,7 @@ struct ClockTraits<std::chrono::system_clock>
     using Timepoint = std::chrono::system_clock::time_point;
     using Snapshot = ClockSnapshot<Timepoint, NoStatus>;
 
-    /// \brief Obtains the current system-clock snapshot from the backend.
+    /// @brief Obtains the current system-clock snapshot from the backend.
     static Snapshot CallNow(const Backend& impl) noexcept;
 };
 

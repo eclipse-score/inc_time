@@ -25,12 +25,10 @@ namespace high_res_steady_time
 namespace sys_time
 {
 
-///
-/// \brief Production HighResSteadyTime backend for non-QNX platforms.
+/// @brief Production HighResSteadyTime backend for non-QNX platforms.
 ///
 /// Reads the current time from @c std::chrono::high_resolution_clock and
 /// converts it to an @c HighResSteadyTime::Timepoint.
-///
 class HighResSteadyClockBackendImpl final : public HighResSteadyClockBackend
 {
   public:
@@ -41,7 +39,7 @@ class HighResSteadyClockBackendImpl final : public HighResSteadyClockBackend
     HighResSteadyClockBackendImpl& operator=(HighResSteadyClockBackendImpl&&) noexcept = delete;
     ~HighResSteadyClockBackendImpl() noexcept override;
 
-    /// \brief Returns the current HIRS snapshot using @c high_resolution_clock.
+    /// @brief Returns the current HIRS snapshot using @c high_resolution_clock.
     ClockSnapshot<HighResSteadyTime::Timepoint, NoStatus> Now() const noexcept override;
 };
 

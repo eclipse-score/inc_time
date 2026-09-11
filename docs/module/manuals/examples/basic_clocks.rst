@@ -279,3 +279,125 @@ To use these patterns in your code:
 
 This layering keeps compile times fast (interface-only deps) and enables testing without
 runtime dependencies.
+
+Use Cases
+---------
+
+HighResSteadyTime
+~~~~~~~~~~~~~~~~~
+
+HT1 — Time Polling
+^^^^^^^^^^^^^^^^^^^
+
+Measure a short code-path latency or compute a tight deadline where call overhead matters.
+``HighResSteadyClock`` avoids a kernel call on QNX by reading the hardware cycle counter
+directly — the same ``Now()`` snapshot pattern used for all clock domains, with no status
+check required.
+
+.. raw:: html
+
+   <div style="overflow-x: auto; max-width: 100%;">
+
+.. uml:: _assets/high_res_steady_time/ht1_polling.puml
+   :alt: HT1 — HighResSteadyTime time polling
+
+.. raw:: html
+
+   </div>
+
+.. code-block:: cpp
+
+   #include "score/time/high_res_steady_time/src/high_res_steady_clock.h"
+   #include <chrono>
+
+   void MyValidator::CheckDeadline()
+   {
+       auto hirs = score::time::HighResSteadyClock::GetInstance();
+       const auto deadline = hirs.Now().TimePoint() + std::chrono::seconds{3};
+
+       // ... do work ...
+
+       if (hirs.Now().TimePoint() > deadline) {
+           HandleDeadlineExceeded();
+       }
+   }
+
+The full working implementation of this pattern is in
+``examples/time/high_res_steady_time/src/high_res_steady_time_handler.h`` and
+``examples/time/high_res_steady_time/src/main.cpp``.
+
+SteadyClock
+~~~~~~~~~~~
+
+ST1 — Time Polling
+^^^^^^^^^^^^^^^^^^^
+
+Measure elapsed time between two points, or derive a deadline, using a clock that is
+guaranteed never to go backward regardless of external time adjustments.
+
+.. raw:: html
+
+   <div style="overflow-x: auto; max-width: 100%;">
+
+.. uml:: _assets/steady_clock/st1_polling.puml
+   :alt: ST1 — SteadyClock time polling
+
+.. raw:: html
+
+   </div>
+
+.. code-block:: cpp
+
+   #include "score/time/steady_time/src/steady_clock.h"
+
+   void MyComponent::MeasureElapsed()
+   {
+       auto clock = score::time::SteadyClock::GetInstance();
+       const auto start = clock.Now().TimePoint();
+
+       // ... do work ...
+
+       const auto elapsed = clock.Now().TimePoint() - start;
+   }
+
+The full working implementation of this pattern is in
+``examples/time/steady_time/src/steady_time_handler.h`` and
+``examples/time/steady_time/src/main.cpp``.
+
+SystemClock
+~~~~~~~~~~~
+
+SC1 — Time Polling
+^^^^^^^^^^^^^^^^^^^
+
+Record a wall-clock timestamp for logging or audit trails where the absolute calendar
+time matters.  Do not use ``SystemClock`` for elapsed time or timeouts — the timepoint
+may jump.
+
+.. raw:: html
+
+   <div style="overflow-x: auto; max-width: 100%;">
+
+.. uml:: _assets/system_clock/sc1_polling.puml
+   :alt: SC1 — SystemClock time polling
+
+.. raw:: html
+
+   </div>
+
+.. code-block:: cpp
+
+   #include "score/time/system_time/src/system_clock.h"
+   #include <chrono>
+
+   void MyLogger::LogEvent()
+   {
+       auto clock = score::time::SystemClock::GetInstance();
+       const auto wall_time = clock.Now().TimePoint();
+       const auto t = std::chrono::system_clock::to_time_t(wall_time);
+       LOG_INFO("Event at: {}", std::ctime(&t));
+   }
+
+The full working implementation of this pattern is in
+``examples/time/system_time/src/system_time_handler.h`` and
+``examples/time/system_time/src/main.cpp``.

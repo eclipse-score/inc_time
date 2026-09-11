@@ -62,3 +62,4 @@ All examples share these implementation patterns:
 
    basic_clocks
    vehicle_time
+   testing

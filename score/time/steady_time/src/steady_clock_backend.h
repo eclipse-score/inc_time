@@ -25,15 +25,13 @@ namespace score
 namespace time
 {
 
-///
-/// \brief Abstract backend interface for the steady-clock domain.
-///
+/// @brief Abstract backend interface for the steady-clock domain.
 class SteadyClockBackend
 {
   public:
     virtual ~SteadyClockBackend() noexcept = default;
 
-    /// \brief Returns the current steady-clock snapshot.
+    /// @brief Returns the current steady-clock snapshot.
     virtual ClockSnapshot<std::chrono::steady_clock::time_point, NoStatus> Now() const noexcept = 0;
 };
 
