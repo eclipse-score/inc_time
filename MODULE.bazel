@@ -101,7 +101,7 @@ bazel_dep(name = "buildifier_prebuilt", version = "8.5.1", dev_dependency = True
 
 bazel_dep(name = "score_baselibs", version = "0.2.12")
 bazel_dep(name = "score_communication", version = "0.4.0")
-bazel_dep(name = "score_lifecycle", version = "0.6.0")
+bazel_dep(name = "score_lifecycle", version = "0.6.1")
 
 # LLVM toolchain — provides @llvm_toolchain//:clang-tidy for the clang-tidy aspect.
 llvm = use_extension(
