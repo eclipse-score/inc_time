@@ -65,6 +65,7 @@ struct GptpEthHdr
 
 static constexpr int64_t kNsPerSec = 1'000'000'000LL;
 static constexpr std::size_t kMaxBpfBufSz = 65536U;
+static constexpr const char* kQnxBpfDevicePrefixEnv = "QNX_BPF_DEVICE_PREFIX";
 
 // PHC frequency adjustment state (PI controller).
 // g_skip_freq_after_step: skip N cycles after a step correction so the
@@ -199,9 +200,9 @@ static int set_iface_promisc(const char* ifname) noexcept
 static int open_tx_loopback_fd(const char* ifname) noexcept
 {
     char devpath[256]{};
-    const char* sock_env = std::getenv("SOCK");
-    if (sock_env != nullptr && sock_env[0] != '\0')
-        std::snprintf(devpath, sizeof(devpath), "%s/dev/bpf0", sock_env);
+    const char* bpf_env = std::getenv(kQnxBpfDevicePrefixEnv);
+    if (bpf_env != nullptr && bpf_env[0] != '\0')
+        std::snprintf(devpath, sizeof(devpath), "%s/dev/bpf0", bpf_env);
     else
         std::snprintf(devpath, sizeof(devpath), "/dev/bpf");
 
@@ -252,9 +253,9 @@ extern "C" int qnx_raw_open(const char* ifname)
     ::strlcpy(g_qnx_ctx.iface_name, ifname, sizeof(g_qnx_ctx.iface_name));
 
     char devpath[256]{};
-    const char* sock_env = std::getenv("SOCK");
-    if (sock_env != nullptr && sock_env[0] != '\0')
-        std::snprintf(devpath, sizeof(devpath), "%s/dev/bpf0", sock_env);
+    const char* bpf_env = std::getenv(kQnxBpfDevicePrefixEnv);
+    if (bpf_env != nullptr && bpf_env[0] != '\0')
+        std::snprintf(devpath, sizeof(devpath), "%s/dev/bpf0", bpf_env);
     else
         std::snprintf(devpath, sizeof(devpath), "/dev/bpf");
 
