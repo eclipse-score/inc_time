@@ -16,13 +16,14 @@
 #include "score/time/clock/src/no_status.h"
 #include "score/time/clock/src/scoped_clock_override.h"
 #include "score/time/high_res_steady_time/src/high_res_steady_clock_backend_mock.h"
-#include "score/time_daemon/src/ipc/receiver_mock.h"
-#include "score/time_daemon/src/ipc/svt/svt_time_info.h"
+#include "score/time/vehicle_time/src/details/td_impl/svt_test_helpers.h"
 
 #include <gtest/gtest.h>
 
 #include <chrono>
+#include <memory>
 #include <optional>
+#include <thread>
 
 namespace score
 {
@@ -32,11 +33,8 @@ namespace
 {
 
 using namespace std::chrono_literals;
+using namespace test_helpers;
 using ::testing::Return;
-
-using SvtMock = score::td::ReceiverMock<score::td::svt::TimeBaseSnapshot>;
-using SvtSnapshot = score::td::svt::TimeBaseSnapshot;
-using SvtStatus = score::td::svt::TimeBaseStatus;
 
 class VehicleClockBackendImplTest : public ::testing::Test
 {
@@ -45,13 +43,30 @@ class VehicleClockBackendImplTest : public ::testing::Test
         : mock_hirs_{std::make_shared<HighResSteadyClockBackendMock>()},
           hirs_guard_{mock_hirs_},
           mock_svt_{std::make_shared<SvtMock>()},
-          impl_{std::make_unique<detail::VehicleClockBackendImpl>(mock_svt_, HighResSteadyClock::GetInstance())}
+          frame_source_{},
+          impl_{std::make_unique<detail::VehicleClockBackendImpl>(mock_svt_,
+                                                                  HighResSteadyClock::GetInstance(),
+                                                                  kPollInterval)}
     {
+    }
+
+    void InitBackend()
+    {
+        EXPECT_CALL(*mock_svt_, Init()).WillOnce(Return(true));
+        EXPECT_TRUE(impl_->Init());
+    }
+
+    void ServeFramesFromSource()
+    {
+        EXPECT_CALL(*mock_svt_, Receive()).WillRepeatedly([this]() {
+            return frame_source_.Get();
+        });
     }
 
     std::shared_ptr<HighResSteadyClockBackendMock> mock_hirs_;
     test_utils::ScopedClockOverride<HighResSteadyTime> hirs_guard_;
     std::shared_ptr<SvtMock> mock_svt_;
+    FrameSource frame_source_;
     std::unique_ptr<detail::VehicleClockBackendImpl> impl_;
 };
 
@@ -260,14 +275,52 @@ TEST_F(VehicleClockBackendImplTest, WaitUntilAvailableReturnsFalseWhenDeadlinePa
     EXPECT_FALSE(impl_->WaitUntilAvailable(score::cpp::stop_source{}.get_token(), past_deadline));
 }
 
-TEST_F(VehicleClockBackendImplTest, CallbackMethodsAreNoOps)
+// ---------------------------------------------------------------------------
+// Init gating of callback delivery (the worker itself is owned by SvtCallbackDispatcher
+// and covered in svt_callback_dispatcher_test.cpp)
+// ---------------------------------------------------------------------------
+
+TEST_F(VehicleClockBackendImplTest, CallbacksAreNotDeliveredBeforeInit)
 {
-    impl_->SetTimeSlaveSyncDataReceivedCallback([](const TimeSlaveSyncData<VehicleTime>&) {});
-    impl_->UnsetTimeSlaveSyncDataReceivedCallback();
-    impl_->SetPDelayMeasurementFinishedCallback([](const PDelayMeasurementData<VehicleTime>&) {});
-    impl_->UnsetPDelayMeasurementFinishedCallback();
-    impl_->SetStatusChangedCallback([](const VehicleTimeStatus&) {});
-    impl_->UnsetStatusChangedCallback();
+    EXPECT_CALL(*mock_svt_, Receive()).Times(0);
+
+    Recorder<VehicleTimeStatus> recorder;
+    impl_->SetStatusChangedCallback([&recorder](const VehicleTimeStatus& status) {
+        recorder.Record(status);
+    });
+
+    std::this_thread::sleep_for(20 * kPollInterval);
+    EXPECT_EQ(recorder.Count(), 0U);
+}
+
+TEST_F(VehicleClockBackendImplTest, CallbacksAreNotDeliveredWhenInitFails)
+{
+    EXPECT_CALL(*mock_svt_, Init()).WillOnce(Return(false));
+    EXPECT_CALL(*mock_svt_, Receive()).Times(0);
+    EXPECT_FALSE(impl_->Init());
+
+    Recorder<VehicleTimeStatus> recorder;
+    impl_->SetStatusChangedCallback([&recorder](const VehicleTimeStatus& status) {
+        recorder.Record(status);
+    });
+
+    std::this_thread::sleep_for(20 * kPollInterval);
+    EXPECT_EQ(recorder.Count(), 0U);
+}
+
+TEST_F(VehicleClockBackendImplTest, CallbackRegisteredBeforeInitIsDeliveredOnceInitSucceeds)
+{
+    Recorder<VehicleTimeStatus> recorder;
+    impl_->SetStatusChangedCallback([&recorder](const VehicleTimeStatus& status) {
+        recorder.Record(status);
+    });
+
+    frame_source_.Set(MakeFrame(kSynchronizedStatus));
+    ServeFramesFromSource();
+    InitBackend();
+
+    ASSERT_TRUE(recorder.WaitForCount(1U));
+    EXPECT_TRUE(recorder.Last().IsFlagActive(VehicleTime::StatusFlag::kSynchronized));
 }
 
 }  // namespace

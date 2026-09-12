@@ -109,7 +109,7 @@ Key features:
 - **Dual time sources**: Both vehicle and local time in single call
 - **Status monitoring**: Reliability and consistency flags
 - **Rate tracking**: Clock deviation measurement
-- **Callback support**: Status change notifications (future feature)
+- **Callback support**: Status change notifications delivered on the backend's worker thread
 
 Main Program
 ~~~~~~~~~~~~
